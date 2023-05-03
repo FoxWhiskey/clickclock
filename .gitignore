@@ -1,0 +1,4 @@
+.pio/
+.vscode/
+clickclock.code-workspace
+platformio.ini
