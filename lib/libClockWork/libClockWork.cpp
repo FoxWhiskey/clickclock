@@ -5,11 +5,15 @@
 
 ESP8266Timer ITimer;
 ESP8266_ISR_Timer ISR_Timer;
+boolean minute_set = false;
 
 extern TimeElements hand;
 
 volatile byte DutyCycles = 0;          //counter to keep track of the duty time
-volatile byte ISRcom = 0;
+volatile byte Btn1Cntr = 0;            //debounce counter button 1
+volatile byte Btn2Cntr = 0;            //debounce counter button 2
+//volatile byte ISRcom = 0|F_POLARITY;   // Polarity of first pulse
+volatile byte ISRcom = 0;                // Polarity of first pulse
 volatile uint ticks = 0;
 volatile byte sec00 = 0;
 volatile time_t tt_hands = 0;
@@ -21,7 +25,7 @@ volatile time_t tt_hands = 0;
 /**
  * @brief ISR for clock hands fast forward
 */
-void ISR_FastForward() {
+void IRAM_ATTR ISR_FastForward() {
     
     if (ISRcom & F_FSTFWD_EN) {                            // if fast forward enabled
       if (ISRcom & F_POLARITY) {
@@ -36,7 +40,7 @@ void ISR_FastForward() {
 /**
  * @brief ISR for clockwork trigger
 */
-void ISR_MinuteTrigger() {
+void IRAM_ATTR ISR_MinuteTrigger() {
 
     if (ISRcom & F_MINUTE_EN) {                            // if minute signal enabled
       if (ISRcom & F_POLARITY) {
@@ -54,22 +58,13 @@ void ISR_MinuteTrigger() {
  * @brief ISR to trigger seconds
  *
 */
-void ISR_SecondTrigger() {
+void IRAM_ATTR ISR_SecondTrigger() {
 
     sec00++;
     sec00 %= byte(60);
     if (sec00 == 0) ISRcom |= F_SEC00;
     else ISRcom &= ~F_SEC00;
     digitalWrite(PIN_LED,sec00 % 2);
-}
-
-
-/**
- * @brief ISR to set F_NTPSYNC
-*/
-void ISR_NTPsync() {
- 
-     ISRcom &= F_NTPSYNC;
 }
 
 /**
@@ -94,8 +89,23 @@ void IRAM_ATTR TimerHandler()
             ticks--;                                      // decrease tick counter
             if (ticks == 0)  ISRcom &= ~F_FSTFWD_EN;      // if requested number of ticks have been reached, disable FASTFORWARD
             }
-    }                                               
-    
+    }
+
+ // check buttons
+
+    if (!digitalRead(PIN_D6)) {
+        if (Btn1Cntr++ == DEBOUNCE_INT) ISRcom |= F_BUTN1;
+    } else {
+        Btn1Cntr = 0;
+        ISRcom &= ~F_BUTN1;
+      };
+
+    if (!digitalRead(PIN_D7)) {
+        if (Btn2Cntr++ == DEBOUNCE_INT) ISRcom |= F_BUTN2;
+    } else {
+        Btn2Cntr = 0;
+        ISRcom &= ~F_BUTN2;
+      };
 
  //then run the ISR_Timer
   ISR_Timer.run();
@@ -142,7 +152,6 @@ boolean setupInterrupts() {
         };
         ISR_Timer.setInterval(TIMER_INTERVAL_FASTF,ISR_FastForward);
         log(DEBUG,__FUNCTION__,"ISR_FastForward timer started...");
-        ISR_Timer.setInterval(TIMER_INTERVAL_3H,ISR_NTPsync);
 
 
 
@@ -171,7 +180,7 @@ return timerStart;
 void setClockHands(int from_hand_h, int from_hand_min, int to_hand_h, int to_hand_min) {
 
    ticks = minute_steps(from_hand_h,from_hand_min,to_hand_h,to_hand_min);
-   log(INFO,__FUNCTION__,"Setting clock hands to %02i:%02i (%i ticks)",to_hand_h,to_hand_min,ticks);
+   log(INFO,__FUNCTION__,"Setting clock hands from %02i:%02i to %02i:%02i (%i ticks)",from_hand_h,from_hand_min,to_hand_h,to_hand_min,ticks);
    ISRcom &= ~F_MINUTE_EN;
    ISRcom |= F_FSTFWD_EN;
 }                                        
@@ -184,28 +193,27 @@ void setClockHands(int from_hand_h, int from_hand_min, int to_hand_h, int to_han
 */
 boolean syncClockWork() {
 
-    TimeElements systime;
+    time_t systime;
     int offset = 0;
     int clicks;
     
     log(INFO,__FUNCTION__,"Waiting for setting window...");
-    while (ISRcom & ~F_SEC00) delay(250);
+    while (!(ISRcom & F_SEC00)) delay(100);          // on F_SEC00,
     if (timeStatus() != timeNotSet) {
-        breakTime(now(),systime);
+        systime = now();                             // get actual system time and
+        tt_hands = systime;                          // set designated position of hour/minute clockwork hands
     } else {
         log(FATAL,__FUNCTION__,"Cannot get system time! Ooops!");
         return false;
     }
 
-    clicks = minute_steps(hand.Hour,hand.Minute,systime.Hour,systime.Hour);
-    if (clicks*TIMER_INTERVAL_FASTF/1000 > 55) {
-        offset = clicks*TIMER_INTERVAL_FASTF/60000; 
-        log(DEBUG,__FUNCTION__,"Estimated hand setting time is %is. Offset required!",clicks*TIMER_INTERVAL_FASTF/1000+offset);
+    clicks = minute_steps(hand.Hour,hand.Minute,hour(systime),minute(systime));
+    if (clicks*int(TIMER_INTERVAL_FASTF)/1000 > 55) {
+        offset = clicks*int(TIMER_INTERVAL_FASTF)/60000; 
+        log(DEBUG,__FUNCTION__,"Hands @ %02i:%02i. Estimated hand setting time is %is. Offset required!",hand.Hour,hand.Minute,clicks*TIMER_INTERVAL_FASTF/1000+offset);
     }
-    setClockHands(hand.Hour,hand.Minute,systime.Hour,systime.Minute+offset);
+    setClockHands(hand.Hour,hand.Minute,hour(systime),minute(systime)+offset);
     while (ISRcom & F_FSTFWD_EN) delay(100);
-    hand = systime;
-    tt_hands = makeTime(hand);
     ISRcom |= F_MINUTE_EN;
 
     return true;
@@ -229,7 +237,25 @@ int minute_steps(int from_h, int from_min, int to_h, int to_min) {
     else return to_mins_delta - from_mins_delta;
 }
 
+/**
+ * @brief Sets the compensation minute, if requested by user.
+ * @brief On system start, no information is available on the required polarity of the first pulse. 
+ * @brief If the wrong pulse is generated, the displayed time lacks a minute (clock is late).
+ * @brief The user can compensate the missing pulse by pressing F_BUTN1.
+*/
+void CompensateMinute() {
+
+    if (!minute_set) {
+        log(INFO,__FUNCTION__,"! Compensation minute set !");
+        setClockHands(hour(tt_hands),minute(tt_hands),hour(tt_hands+60),minute(tt_hands+60));  // set the clockwork + 1min
+        minute_set = true;                                                                     // flag compensate minute is set
+    }
+}
+
+/**
+ * @brief logger function to display state of ISRcom
+*/
 void logISRcom() {
      
-          log(DEBUG,__FUNCTION__," %s | %s | %s | %s | %s | %s",ISRcom & F_POLARITY ? "F_POLARITY" : "          ",ISRcom & F_POWER ? "F_POWER" : "       ",ISRcom & F_MINUTE_EN ? "F_MINUTE_EN" : "           ",ISRcom & F_FSTFWD_EN ? "F_FSTFWD_EN" : "           ",ISRcom & F_NTPSYNC ? "F_NTPSYNC" : "         ",ISRcom & F_SEC00 ? "F_SEC00" : "      ");
+          log(DEBUG,__FUNCTION__," %s | %s | %s | %s | %s | %s | %s",ISRcom & F_POLARITY ? "F_POLARITY" : "          ",ISRcom & F_POWER ? "F_POWER" : "       ",ISRcom & F_MINUTE_EN ? "F_MINUTE_EN" : "           ",ISRcom & F_FSTFWD_EN ? "F_FSTFWD_EN" : "           ",ISRcom & F_BUTN1 ? "F_BUTN1" : "       ",ISRcom & F_BUTN2 ? "F_BUTN2" : "       ",ISRcom & F_SEC00 ? "F_SEC00" : "      ");
 }
