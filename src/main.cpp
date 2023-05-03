@@ -10,8 +10,8 @@
 
 loglevel setloglevel = DEBUG;
 
-#define HOUR_HAND_DEFAULT 19        // the default position of hour hand
-#define  MIN_HAND_DEFAULT 05        // the default position of minute hand
+#define HOUR_HAND_DEFAULT 22       // the default position of hour hand
+#define  MIN_HAND_DEFAULT 49       // the default position of minute hand
 
 extern const char ssid[];
 extern const char pass[];
@@ -21,6 +21,8 @@ extern WiFiUDP Udp;
 extern unsigned int localPort;
 time_t NTPsyncInterval = 1800;
 TimeElements hand;
+extern time_t tt_hands;
+extern boolean minute_set;
 
 void setup()
 {
@@ -29,7 +31,11 @@ void setup()
   // ******** set outputs *********************
   pinMode(PIN_D1,OUTPUT);
   pinMode(PIN_D2,OUTPUT);
+  pinMode(PIN_D5,OUTPUT);
   pinMode(PIN_LED,OUTPUT);
+  pinMode(PIN_D6,INPUT_PULLUP);
+  pinMode(PIN_D7,INPUT_PULLUP);
+
   digitalWrite(PIN_D1,HIGH);
   digitalWrite(PIN_D2,HIGH);
   digitalWrite(PIN_D5,HIGH);
@@ -64,9 +70,10 @@ void setup()
   // ********** synchronise clock work to system time and run clock
   hand.Hour = HOUR_HAND_DEFAULT;    // the present time display before sync'ing...
   hand.Minute = MIN_HAND_DEFAULT;
+  ISRcom |= F_SEC00;                // this can ONLY be done during setup, as it immediately follows setupInterrupts() !!!
   syncClockWork();
   log(DEBUG,__FUNCTION__,"ISRcom: %i",int(ISRcom));
-  log(INFO, __FUNCTION__, "%s", "Setup completed");
+  log(INFO, __FUNCTION__, "%s", "clickclock-setup completed.");
   
 }
 
@@ -74,7 +81,6 @@ time_t prevDisplay = 0;
 void loop()
 {
   logISRcom();
-
   delay(200);
   if (ISRcom & F_SEC00) {
      if (timeStatus() != timeNotSet)
@@ -82,9 +88,11 @@ void loop()
        if (now() != prevDisplay)
        { // update the display only if time has changed
          prevDisplay = now();
-         digitalClockDisplay();
+         log(INFO,__FUNCTION__,"[%02i:%02i]: Hands at %02i:%02i",hour(prevDisplay),minute(prevDisplay),hour(tt_hands),minute(tt_hands));
        }
      }
   }
-  
+  // check if compensation minute has been requested
+  if (ISRcom & F_BUTN1) CompensateMinute();
+  if (minute_set & !(ISRcom & F_FSTFWD_EN)) ISRcom |= F_MINUTE_EN;
 }
