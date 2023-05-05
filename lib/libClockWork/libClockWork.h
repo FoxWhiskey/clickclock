@@ -16,7 +16,8 @@
 
 #define HW_TIMER_INTERVAL           50L               // ms
 #define DUTYCYCLES                    6               // HW_TIMER_INTERVAL * DUTYCYCLES defines duty interval
-#define DEBOUNCE_INT                  4               // HW_TIMER_INTERVAL * DEBOUNCE_INT defines debounce interval fo  r buttons 1 & 2
+#define DEBOUNCE_INT                  5               // HW_TIMER_INTERVAL * DEBOUNCE_INT defines debounce interval for buttons 1 & 2
+#define BUTTON_LONG                  15               // HW_TIMER_INTERVAL * BUTTON_LONG defines time intervall for a long button press
 #define TIMER_INTERVAL_60S          60000L
 #define TIMER_INTERVAL_FASTF        499L              // roughly 500ms, prime number
 #define TIMER_INTERVAL_1000MS       1000L             // 1000ms
@@ -26,16 +27,23 @@
 #define F_POWER                  2      // power state of drive, false: power off, true: power on
 #define F_MINUTE_EN              4      // ISR 60s-period enabled/disabled
 #define F_FSTFWD_EN              8      // ISR 500ms-period enabled/disabled
-#define RFU                     16      // RFU
-#define F_SEC00                 32      // true: system time second is [00], false: system time second is [01-59]
-#define F_BUTN1                 64      // Button 1 pressed (debounced)
-#define F_BUTN2                128      // Button 2 pressed (debounced)
+#define F_SEC00                 16      // true: system time second is [00], false: system time second is [01-59]
+#define F_RFU1                  32      // RFU
+#define F_RFU2                  64      // RFU
+#define F_RFU3                 128      // RFU
+
+// flags to signal button state
+#define F_BUTN1                  1      // Button 1 pressed short (debounced)
+#define F_BUTN1LONG              2      // Button 1 pressed long (debounced)
+#define F_BUTN2                  4      // Button 2 pressed short (debounced)
+#define F_BUTN2LONG              8      // Button 2 pressed long (debounced)
 
 #include "ESP8266TimerInterrupt.h"
 #include "ESP8266_ISR_Timer.hpp"
 
 extern ESP8266_ISR_Timer ISR_Timer;  // declaration of the global variable ISRTimer
 extern volatile byte ISRcom;
+extern volatile byte ISRbtn;
 extern volatile uint ticks;
 
 boolean setupInterrupts();           // start interrupt processing
@@ -43,4 +51,4 @@ void setClockHands(int from_hand_h, int from_hand_min, int to_hand_h, int to_han
 boolean syncClockWork();
 int minute_steps(int from_h, int from_min, int to_h, int to_min); // calculate the number steps needed between two times
 void CompensateMinute();
-void logISRcom();
+void logISR();

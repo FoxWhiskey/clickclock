@@ -14,6 +14,7 @@ volatile byte Btn1Cntr = 0;            //debounce counter button 1
 volatile byte Btn2Cntr = 0;            //debounce counter button 2
 //volatile byte ISRcom = 0|F_POLARITY;   // Polarity of first pulse
 volatile byte ISRcom = 0;                // Polarity of first pulse
+volatile byte ISRbtn = 0;              // state of buttons
 volatile uint ticks = 0;
 volatile byte sec00 = 0;
 volatile time_t tt_hands = 0;
@@ -91,21 +92,43 @@ void IRAM_ATTR TimerHandler()
             }
     }
 
- // check buttons
+ // check buttons (distinguish between long and short press)
 
-    if (!digitalRead(PIN_D6)) {
-        if (Btn1Cntr++ == DEBOUNCE_INT) ISRcom |= F_BUTN1;
-    } else {
-        Btn1Cntr = 0;
-        ISRcom &= ~F_BUTN1;
-      };
+    if (!digitalRead(PIN_D6)) {                                 // if button pressed,
+        if (Btn1Cntr++ > BUTTON_LONG) ISRbtn |= F_BUTN1LONG;    // set F_BUTNxLONG, as soon as BUTTON_LONG cycles have been counted
+    }
+    else {
+        if (ISRbtn & F_BUTN1LONG) {                             // if button not pressed and  F_BUTN1LONG set
+            Btn1Cntr = 0;                                       // signal "button release"
+            ISRbtn &= ~ F_BUTN1LONG;
+        }
+        if (Btn1Cntr > DEBOUNCE_INT) {                          // if button is pressed and DEBOUNCE_INT have been counted
+            Btn1Cntr--;                                         // keep flag set 
+            ISRbtn |= F_BUTN1;
+        }
+        else {
+           Btn1Cntr = 0;
+           ISRbtn &= ~F_BUTN1;
+        };
+    };
 
     if (!digitalRead(PIN_D7)) {
-        if (Btn2Cntr++ == DEBOUNCE_INT) ISRcom |= F_BUTN2;
-    } else {
-        Btn2Cntr = 0;
-        ISRcom &= ~F_BUTN2;
-      };
+        if (Btn2Cntr++ > BUTTON_LONG) ISRbtn |= F_BUTN2LONG;
+    }
+    else {
+        if (ISRbtn & F_BUTN2LONG) {
+            Btn2Cntr = 0;
+            ISRbtn &= ~ F_BUTN2LONG;
+        }
+        if (Btn2Cntr > DEBOUNCE_INT) {
+            Btn2Cntr--;
+            ISRbtn |= F_BUTN2;
+        }
+        else {
+           Btn2Cntr = 0;
+           ISRbtn &= ~F_BUTN2;
+        };
+    };
 
  //then run the ISR_Timer
   ISR_Timer.run();
@@ -253,9 +276,9 @@ void CompensateMinute() {
 }
 
 /**
- * @brief logger function to display state of ISRcom
+ * @brief logger function to display state of ISRcom and ISRbtn
 */
-void logISRcom() {
+void logISR() {
      
-          log(DEBUG,__FUNCTION__," %s | %s | %s | %s | %s | %s | %s",ISRcom & F_POLARITY ? "F_POLARITY" : "          ",ISRcom & F_POWER ? "F_POWER" : "       ",ISRcom & F_MINUTE_EN ? "F_MINUTE_EN" : "           ",ISRcom & F_FSTFWD_EN ? "F_FSTFWD_EN" : "           ",ISRcom & F_BUTN1 ? "F_BUTN1" : "       ",ISRcom & F_BUTN2 ? "F_BUTN2" : "       ",ISRcom & F_SEC00 ? "F_SEC00" : "      ");
+          log(DEBUG,__FUNCTION__," %s | %s | %s | %s | %s | %s | %s | %s | %s |",ISRcom & F_POLARITY ? "F_POLARITY" : "          ",ISRcom & F_POWER ? "F_POWER" : "       ",ISRcom & F_MINUTE_EN ? "F_MINUTE_EN" : "           ",ISRcom & F_FSTFWD_EN ? "F_FSTFWD_EN" : "           ",ISRcom & F_SEC00 ? "F_SEC00" : "       ",ISRbtn & F_BUTN1 ? "F_BUTN1" : "       ",ISRbtn & F_BUTN2 ? "F_BUTN2" : "       ",ISRbtn & F_BUTN1LONG ? "F_BUTN1LONG" : "           ",ISRbtn & F_BUTN2LONG ? "F_BUTN2LONG" : "           ");
 }

@@ -8,10 +8,10 @@
 #include <WiFiUdp.h>
 #include "ntp.h"
 
-loglevel setloglevel = DEBUG;
+loglevel setloglevel = INFO;
 
-#define HOUR_HAND_DEFAULT 22       // the default position of hour hand
-#define  MIN_HAND_DEFAULT 49       // the default position of minute hand
+#define HOUR_HAND_DEFAULT 21       // the default position of hour hand
+#define  MIN_HAND_DEFAULT 58       // the default position of minute hand
 
 extern const char ssid[];
 extern const char pass[];
@@ -80,7 +80,7 @@ void setup()
 time_t prevDisplay = 0;
 void loop()
 {
-  logISRcom();
+  logISR();
   delay(200);
   if (ISRcom & F_SEC00) {
      if (timeStatus() != timeNotSet)
@@ -93,6 +93,6 @@ void loop()
      }
   }
   // check if compensation minute has been requested
-  if (ISRcom & F_BUTN1) CompensateMinute();
+  if (ISRbtn & F_BUTN1LONG) CompensateMinute();
   if (minute_set & !(ISRcom & F_FSTFWD_EN)) ISRcom |= F_MINUTE_EN;
 }
