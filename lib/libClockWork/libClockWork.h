@@ -10,9 +10,9 @@
 #define TIMER_INTERRUPT_DEBUG       0
 #define _TIMERINTERRUPT_LOGLEVEL_   0
 
-#define USING_TIM_DIV1                false           // for shortest and most accurate timer
+#define USING_TIM_DIV1                true           // for shortest and most accurate timer
 #define USING_TIM_DIV16               false           // for medium time and medium accurate timer
-#define USING_TIM_DIV256              true            // for longest timer but least accurate. Default
+#define USING_TIM_DIV256              false            // for longest timer but least accurate. Default
 
 #define HW_TIMER_INTERVAL           50L               // ms
 #define DUTYCYCLES                    6               // HW_TIMER_INTERVAL * DUTYCYCLES defines duty interval
@@ -51,4 +51,6 @@ void setClockHands(int from_hand_h, int from_hand_min, int to_hand_h, int to_han
 boolean syncClockWork();
 int minute_steps(int from_h, int from_min, int to_h, int to_min); // calculate the number steps needed between two times
 void CompensateMinute();
+void transformDHP(TimeElements &te, int defaultHour);
+int  hour2clockface(int hour_24);
 void logISR();

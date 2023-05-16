@@ -1,7 +1,7 @@
 #include<Arduino.h>
 #include<log.h>
-#include<libClockWork.h>
 #include<TimeLib.h>
+#include<libClockWork.h>
 
 ESP8266Timer ITimer;
 ESP8266_ISR_Timer ISR_Timer;
@@ -33,7 +33,8 @@ void IRAM_ATTR ISR_FastForward() {
          digitalWrite(PIN_D1,LOW);                         // Power on, positive polarity
       } else {
          digitalWrite(PIN_D2,LOW);                         // Power on, negative polarity
-      }                              
+      }
+      tt_hands += 60;                                      // update current clock hand setting // bugfix issue #9                              
       ISRcom |= F_POWER;                                   // flag Power ON
     }
 }
@@ -219,12 +220,12 @@ boolean syncClockWork() {
     time_t systime;
     int offset = 0;
     int clicks;
+    int prevMinute = 0;
     
     log(INFO,__FUNCTION__,"Waiting for setting window...");
     while (!(ISRcom & F_SEC00)) delay(100);          // on F_SEC00,
     if (timeStatus() != timeNotSet) {
-        systime = now();                             // get actual system time and
-        tt_hands = systime;                          // set designated position of hour/minute clockwork hands
+        systime = now();                             // get actual system time
     } else {
         log(FATAL,__FUNCTION__,"Cannot get system time! Ooops!");
         return false;
@@ -232,11 +233,18 @@ boolean syncClockWork() {
 
     clicks = minute_steps(hand.Hour,hand.Minute,hour(systime),minute(systime));
     if (clicks*int(TIMER_INTERVAL_FASTF)/1000 > 55) {
-        offset = clicks*int(TIMER_INTERVAL_FASTF)/60000; 
-        log(DEBUG,__FUNCTION__,"Hands @ %02i:%02i. Estimated hand setting time is %is. Offset required!",hand.Hour,hand.Minute,clicks*TIMER_INTERVAL_FASTF/1000+offset);
+        offset = clicks*int(TIMER_INTERVAL_FASTF)/1000;  // bugfix issue #7
+        log(DEBUG,__FUNCTION__,"Hands @ %02i:%02i. Estimated hand setting time is %is. Offset required!",hand.Hour,hand.Minute,offset);
     }
-    setClockHands(hand.Hour,hand.Minute,hour(systime),minute(systime)+offset);
-    while (ISRcom & F_FSTFWD_EN) delay(100);
+    setClockHands(hand.Hour,hand.Minute,hour(systime+time_t(offset)),minute(systime+time_t(offset)));  // bugfix issue #7
+    while (ISRcom & F_FSTFWD_EN) {
+        delay(100);
+        if (minute(tt_hands) != prevMinute)
+        {
+          log(DEBUG,__FUNCTION__,"hand position: %02i:%02i",hour2clockface(hour(tt_hands)),minute(tt_hands));
+          prevMinute = minute(tt_hands);
+        }
+    }
     ISRcom |= F_MINUTE_EN;
 
     return true;
@@ -267,12 +275,39 @@ int minute_steps(int from_h, int from_min, int to_h, int to_min) {
  * @brief The user can compensate the missing pulse by pressing F_BUTN1.
 */
 void CompensateMinute() {
-
-    if (!minute_set) {
+    
+    time_t comp_time;
+    if (!minute_set) 
+    {
+        comp_time = tt_hands;
+        tt_hands -= 60;  // bugfix issue 10
         log(INFO,__FUNCTION__,"! Compensation minute set !");
-        setClockHands(hour(tt_hands),minute(tt_hands),hour(tt_hands+60),minute(tt_hands+60));  // set the clockwork + 1min
+        setClockHands(hour(comp_time),minute(comp_time),hour(comp_time+60),minute(comp_time+60));  // set the clockwork + 1min
         minute_set = true;                                                                     // flag compensate minute is set
     }
+}
+
+/**
+ * @brief transforms a given default hand position of the clockwork drive to match the nearest "true" NTP time stamp. 
+ * @brief TimeElements is altered accordingly. Needed once during system boot to set "tt_hands" correctly
+ * @param TimeElements the present NTP time stamp
+ * @param int default hour hand position 
+*/ 
+void transformDHP(TimeElements &te, int defaultHour) {
+
+    if (te.Hour > 12) te.Hour = (defaultHour % 12) + 12;
+    else te.Hour = defaultHour % 12;
+}
+
+/**
+ * @brief transforms the current hour into a clock-face equivalent
+ * @param int an hour value between 0 and 23
+ * @return int corresponding hour value between 1 and 12
+*/
+int hour2clockface(int hour_24) {
+    
+    if ((hour_24 % 12) == 0) return int(12);
+    else return int(hour_24 % 12);
 }
 
 /**
