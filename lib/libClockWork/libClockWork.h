@@ -28,7 +28,7 @@
 #define F_MINUTE_EN              4      // ISR 60s-period enabled/disabled
 #define F_FSTFWD_EN              8      // ISR 500ms-period enabled/disabled
 #define F_SEC00                 16      // true: system time second is [00], false: system time second is [01-59]
-#define F_RFU1                  32      // RFU
+#define F_CM_SET                32      // true: compensation minute set, false: not set      // issue #8
 #define F_RFU2                  64      // RFU
 #define F_RFU3                 128      // RFU
 

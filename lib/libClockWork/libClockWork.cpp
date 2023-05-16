@@ -5,7 +5,6 @@
 
 ESP8266Timer ITimer;
 ESP8266_ISR_Timer ISR_Timer;
-boolean minute_set = false;
 
 extern TimeElements hand;
 
@@ -277,13 +276,13 @@ int minute_steps(int from_h, int from_min, int to_h, int to_min) {
 void CompensateMinute() {
     
     time_t comp_time;
-    if (!minute_set) 
+    if (!(ISRcom & F_CM_SET)) 
     {
         comp_time = tt_hands;
         tt_hands -= 60;  // bugfix issue 10
         log(INFO,__FUNCTION__,"! Compensation minute set !");
         setClockHands(hour(comp_time),minute(comp_time),hour(comp_time+60),minute(comp_time+60));  // set the clockwork + 1min
-        minute_set = true;                                                                     // flag compensate minute is set
+        ISRcom |= F_CM_SET;                                                                     // flag compensate minute is set
     }
 }
 
@@ -315,5 +314,5 @@ int hour2clockface(int hour_24) {
 */
 void logISR() {
      
-          log(DEBUG,__FUNCTION__," %s | %s | %s | %s | %s | %s | %s | %s | %s |",ISRcom & F_POLARITY ? "F_POLARITY" : "          ",ISRcom & F_POWER ? "F_POWER" : "       ",ISRcom & F_MINUTE_EN ? "F_MINUTE_EN" : "           ",ISRcom & F_FSTFWD_EN ? "F_FSTFWD_EN" : "           ",ISRcom & F_SEC00 ? "F_SEC00" : "       ",ISRbtn & F_BUTN1 ? "F_BUTN1" : "       ",ISRbtn & F_BUTN2 ? "F_BUTN2" : "       ",ISRbtn & F_BUTN1LONG ? "F_BUTN1LONG" : "           ",ISRbtn & F_BUTN2LONG ? "F_BUTN2LONG" : "           ");
+          log(DEBUG,__FUNCTION__," %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |",ISRcom & F_POLARITY ? "F_POLARITY" : "          ",ISRcom & F_POWER ? "F_POWER" : "       ",ISRcom & F_MINUTE_EN ? "F_MINUTE_EN" : "           ",ISRcom & F_FSTFWD_EN ? "F_FSTFWD_EN" : "           ",ISRcom & F_SEC00 ? "F_SEC00" : "       ",ISRcom & F_CM_SET ? "F_CM_SET" : "        ",ISRbtn & F_BUTN1 ? "F_BUTN1" : "       ",ISRbtn & F_BUTN2 ? "F_BUTN2" : "       ",ISRbtn & F_BUTN1LONG ? "F_BUTN1LONG" : "           ",ISRbtn & F_BUTN2LONG ? "F_BUTN2LONG" : "           ");
 }

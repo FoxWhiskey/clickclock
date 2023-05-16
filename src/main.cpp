@@ -10,7 +10,7 @@
 
 loglevel setloglevel = DEBUG;
 
-#define HOUR_HAND_DEFAULT 16       // the default position of hour hand
+#define HOUR_HAND_DEFAULT 12       // the default position of hour hand
 #define  MIN_HAND_DEFAULT 41       // the default position of minute hand
 
 extern const char ssid[];
@@ -22,7 +22,6 @@ extern unsigned int localPort;
 time_t NTPsyncInterval = 1800;
 TimeElements hand;
 extern time_t tt_hands;
-extern boolean minute_set;
 
 void setup()
 {
@@ -108,5 +107,5 @@ void loop()
 
   // check if compensation minute has been requested
   if (ISRbtn & F_BUTN1LONG) CompensateMinute();
-  if (minute_set & !(ISRcom & F_FSTFWD_EN)) ISRcom |= F_MINUTE_EN;
+  if ((ISRcom & F_CM_SET) && !(ISRcom & F_FSTFWD_EN)) ISRcom |= F_MINUTE_EN;
 }
