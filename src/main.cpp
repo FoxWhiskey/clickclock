@@ -8,10 +8,10 @@
 #include <WiFiUdp.h>
 #include "ntp.h"
 
-loglevel setloglevel = INFO;
+loglevel setloglevel = DEBUG;
 
-#define HOUR_HAND_DEFAULT 21       // the default position of hour hand
-#define  MIN_HAND_DEFAULT 58       // the default position of minute hand
+#define HOUR_HAND_DEFAULT 16       // the default position of hour hand
+#define  MIN_HAND_DEFAULT 41       // the default position of minute hand
 
 extern const char ssid[];
 extern const char pass[];
@@ -62,14 +62,16 @@ void setup()
   log(INFO,__FUNCTION__,"NTP-interval is %i sec",(uint32_t)NTPsyncInterval);
   while (timeStatus() == timeNotSet) {
     delay(100);
-    breakTime(now(),hand);
-  }
+  } 
+  breakTime(now(),hand);
   digitalClockDisplay();
+  transformDHP(hand,HOUR_HAND_DEFAULT); // build a valid time element for current clockwork setting // bugfix issue #9
+  hand.Minute = MIN_HAND_DEFAULT;
+  tt_hands = makeTime(hand);            // set the current clockwork hand setting  // bugfix issue #9
+  log(INFO,__FUNCTION__,"Hand position at %02i:%02i",hour2clockface(hour(tt_hands)),minute(tt_hands));
   // ********** timer interrupt setup **********
   setupInterrupts();
   // ********** synchronise clock work to system time and run clock
-  hand.Hour = HOUR_HAND_DEFAULT;    // the present time display before sync'ing...
-  hand.Minute = MIN_HAND_DEFAULT;
   ISRcom |= F_SEC00;                // this can ONLY be done during setup, as it immediately follows setupInterrupts() !!!
   syncClockWork();
   log(DEBUG,__FUNCTION__,"ISRcom: %i",int(ISRcom));
@@ -88,10 +90,22 @@ void loop()
        if (now() != prevDisplay)
        { // update the display only if time has changed
          prevDisplay = now();
-         log(INFO,__FUNCTION__,"[%02i:%02i]: Hands at %02i:%02i",hour(prevDisplay),minute(prevDisplay),hour(tt_hands),minute(tt_hands));
+         log(INFO,__FUNCTION__,"[%02i:%02i]: Hands at %02i:%02i",hour(prevDisplay),minute(prevDisplay),hour2clockface(hour(tt_hands)),minute(tt_hands));
+         /*
+          * Test on time gap between systemtime/NTP and clockwork time - resync clockwork if needed
+          */
+        if (abs(prevDisplay-tt_hands) > 60)   // if NTP and clockwork out of sync
+          {
+            log(WARN,__FUNCTION__,"delta_t is %is Clockwork out of sync! Resyncing...",abs(prevDisplay-tt_hands));
+            ISRcom &= ~F_MINUTE_EN;              // stop clockwork
+            hand.Hour = hour(tt_hands);          // set default clockwork position
+            hand.Minute = minute(tt_hands);      //  (comparable with system boot)
+            syncClockWork();                     // resync clockwork - assuming F_SEC00 is still set (!)
+          }
        }
      }
   }
+
   // check if compensation minute has been requested
   if (ISRbtn & F_BUTN1LONG) CompensateMinute();
   if (minute_set & !(ISRcom & F_FSTFWD_EN)) ISRcom |= F_MINUTE_EN;
