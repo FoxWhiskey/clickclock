@@ -39,7 +39,7 @@ the intial position of the clockwork's hands at compiling time. Default value is
 
 
 ## Hardware setup
-Provided, the DEBO DRV3 developer board is used, find the default connections from the diagram below. Default pins are defined in `libClockWork.h`.   
+Provided the DEBO DRV3 developer board is used, find the default connections from the diagram below. Default pins are defined in `libClockWork.h`.   
 ```
 BUTTON       ESP8266       DEBO DRV3    CLOCKWORK
 
@@ -58,13 +58,13 @@ BUTTON       ESP8266       DEBO DRV3    CLOCKWORK
 ## Software versions
 ### v1.0.x
 The the very first version of `clickclock`.   
-* The clockwork is set to NTP automatically, however the intial clock hand position has to be make known to `clickclock` by defining the initial position in `main.cpp`.   
+* The clockwork is set to NTP automatically, however the intial clock hand position has to be made known to `clickclock` by defining the initial position in `main.cpp`.   
 * a couple of bugfixes, most importantly a bug introduced by [khoih-prog/ESP8266TimerInterrupt][3] due to an incomplete library documentation - see [tech note](#tech-notes) below.
 * ISR-routines to get the (debounced) states of two bush buttons connected to the ESP.
 ### v1.1.x
 * detect mismatch between system time (NTP) and indicated clockwork time. Needed at least twice a year when DST is de-/activated.
 * Trigger different functions when push buttons are pressed short or long
-* `BUTN_1` sets a compensation minute.   
+* `BUTN_1` (long press) sets a compensation minute.   
 When the system is started, no information is available on the polarity of the last electrical pulse. When setting the clockwork to the current time, there is a 50% chance that the first pulse is sent with an unmatched polarity and the clockwork does not move the hands with the first pulse. As a consequence, the time display is set one minute late. So a manual input is required to compensate for the late time display. A compensation minute can only be set once.
 ## Tech Notes
 1. The [IDUINO DEBO DRV3][2] is a two-channel stepper motor developer board based on the L298N H-bridge chip. The board does not only drive stepper motors, but also has the ability to convert the input voltage (5-35V) down to 5V to supply power to connected microcontroller boards. The voltage regulation circuit is based on the 78M05. While the IDUINO datasheets allow input voltages of up to 35V, the maximum input ratings of the 78M05 cannot be told clearly from the relevant datasheet and may be limited to 18V. As a matter of fact, connecting the DEBO DRV3 to an input voltage of 24V destroys the on-board 78M05 immediately. Due to pin compatibility, it is possible to replace the chip by an LM341, granting a maximum input voltage of 35V.
