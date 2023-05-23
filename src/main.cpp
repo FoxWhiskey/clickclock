@@ -8,10 +8,10 @@
 #include <WiFiUdp.h>
 #include "ntp.h"
 
-loglevel setloglevel = DEBUG;
+loglevel setloglevel = INFO;
 
-#define HOUR_HAND_DEFAULT 12       // the default position of hour hand
-#define  MIN_HAND_DEFAULT 41       // the default position of minute hand
+#define HOUR_HAND_DEFAULT 8       // the default position of hour hand
+#define  MIN_HAND_DEFAULT 54       // the default position of minute hand
 
 extern const char ssid[];
 extern const char pass[];
@@ -22,6 +22,8 @@ extern unsigned int localPort;
 time_t NTPsyncInterval = 1800;
 TimeElements hand;
 extern time_t tt_hands;
+extern unsigned long millis_now;
+extern unsigned long millis_prev;
 
 void setup()
 {
@@ -89,7 +91,7 @@ void loop()
        if (now() != prevDisplay)
        { // update the display only if time has changed
          prevDisplay = now();
-         log(INFO,__FUNCTION__,"[%02i:%02i]: Hands at %02i:%02i",hour(prevDisplay),minute(prevDisplay),hour2clockface(hour(tt_hands)),minute(tt_hands));
+         log(INFO,__FUNCTION__,"[%02i:%02i:%02i]: Hands at %02i:%02i - delta_t=%ims",hour(prevDisplay),minute(prevDisplay),second(prevDisplay),hour2clockface(hour(tt_hands)),minute(tt_hands),millis_now-millis_prev);
          /*
           * Test on time gap between systemtime/NTP and clockwork time - resync clockwork if needed
           */
@@ -100,6 +102,7 @@ void loop()
             hand.Hour = hour(tt_hands);          // set default clockwork position
             hand.Minute = minute(tt_hands);      //  (comparable with system boot)
             syncClockWork();                     // resync clockwork - assuming F_SEC00 is still set (!)
+            ISRcom &= ~F_TIMELAG;                // clear time lag flag
           }
        }
      }
@@ -108,4 +111,9 @@ void loop()
   // check if compensation minute has been requested
   if (ISRbtn & F_BUTN1LONG) CompensateMinute();
   if ((ISRcom & F_CM_SET) && !(ISRcom & F_FSTFWD_EN)) ISRcom |= F_MINUTE_EN;
+  // check if time lag test function has been requested
+  if ((ISRbtn & F_BUTN2LONG) && !(ISRcom & F_TIMELAG)) {
+    ISRbtn |= F_TIMELAG;          // set F_TIMELAG
+    tt_hands -= 3600;             // introduce time lag by tweaking clock hand position
+  }
 }

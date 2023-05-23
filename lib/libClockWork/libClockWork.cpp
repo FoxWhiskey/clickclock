@@ -17,6 +17,8 @@ volatile byte ISRbtn = 0;              // state of buttons
 volatile uint ticks = 0;
 volatile byte sec00 = 0;
 volatile time_t tt_hands = 0;
+volatile unsigned long millis_prev = 0;
+volatile unsigned long millis_now = 0;
 
 /**
  *  --- ISR service routines ---
@@ -43,6 +45,8 @@ void IRAM_ATTR ISR_FastForward() {
 */
 void IRAM_ATTR ISR_MinuteTrigger() {
 
+    millis_prev = millis_now;                              // time elapsed between two calls of ISR_MinuteTrigger()
+    millis_now = millis();                                
     if (ISRcom & F_MINUTE_EN) {                            // if minute signal enabled
       if (ISRcom & F_POLARITY) {
          digitalWrite(PIN_D1,LOW);                         // Power on, positive polarity
@@ -151,6 +155,7 @@ boolean sync_ISR_MinuteTrigger() {
            if (timeStatus() != timeNotSet) sec_now = second();
         };
         ISR_Timer.setInterval(TIMER_INTERVAL_60S,ISR_MinuteTrigger);
+        millis_now = millis();                                        // initialize time stamp
         ISR_Timer.setInterval(TIMER_INTERVAL_1000MS,ISR_SecondTrigger);
         if (timeStatus() != timeNotSet) { 
            epoch = now();
@@ -314,5 +319,5 @@ int hour2clockface(int hour_24) {
 */
 void logISR() {
      
-          log(DEBUG,__FUNCTION__," %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |",ISRcom & F_POLARITY ? "F_POLARITY" : "          ",ISRcom & F_POWER ? "F_POWER" : "       ",ISRcom & F_MINUTE_EN ? "F_MINUTE_EN" : "           ",ISRcom & F_FSTFWD_EN ? "F_FSTFWD_EN" : "           ",ISRcom & F_SEC00 ? "F_SEC00" : "       ",ISRcom & F_CM_SET ? "F_CM_SET" : "        ",ISRbtn & F_BUTN1 ? "F_BUTN1" : "       ",ISRbtn & F_BUTN2 ? "F_BUTN2" : "       ",ISRbtn & F_BUTN1LONG ? "F_BUTN1LONG" : "           ",ISRbtn & F_BUTN2LONG ? "F_BUTN2LONG" : "           ");
+          log(DEBUG,__FUNCTION__," %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |",ISRcom & F_POLARITY ? "F_POLARITY" : "          ",ISRcom & F_POWER ? "F_POWER" : "       ",ISRcom & F_MINUTE_EN ? "F_MINUTE_EN" : "           ",ISRcom & F_FSTFWD_EN ? "F_FSTFWD_EN" : "           ",ISRcom & F_SEC00 ? "F_SEC00" : "       ",ISRcom & F_CM_SET ? "F_CM_SET" : "        ",ISRcom & F_TIMELAG ? "F_TIMELAG" : "         ",ISRbtn & F_BUTN1 ? "F_BUTN1" : "       ",ISRbtn & F_BUTN2 ? "F_BUTN2" : "       ",ISRbtn & F_BUTN1LONG ? "F_BUTN1LONG" : "           ",ISRbtn & F_BUTN2LONG ? "F_BUTN2LONG" : "           ");
 }
