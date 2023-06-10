@@ -10,8 +10,8 @@
 
 loglevel setloglevel = INFO;
 
-#define HOUR_HAND_DEFAULT 8       // the default position of hour hand
-#define  MIN_HAND_DEFAULT 54       // the default position of minute hand
+#define HOUR_HAND_DEFAULT 6       // the default position of hour hand
+#define  MIN_HAND_DEFAULT 23       // the default position of minute hand
 
 extern const char ssid[];
 extern const char pass[];
@@ -81,6 +81,7 @@ void setup()
 }
 
 time_t prevDisplay = 0;
+time_t time_now = 0;
 void loop()
 {
   logISR();
@@ -88,9 +89,10 @@ void loop()
   if (ISRcom & F_SEC00) {
      if (timeStatus() != timeNotSet)
      {
-       if (now() != prevDisplay)
+       time_now = now();
+       if (time_now != prevDisplay)
        { // update the display only if time has changed
-         prevDisplay = now();
+         prevDisplay = time_now;
          log(INFO,__FUNCTION__,"[%02i:%02i:%02i]: Hands at %02i:%02i - delta_t=%ims",hour(prevDisplay),minute(prevDisplay),second(prevDisplay),hour2clockface(hour(tt_hands)),minute(tt_hands),millis_now-millis_prev);
          /*
           * Test on time gap between systemtime/NTP and clockwork time - resync clockwork if needed
@@ -105,7 +107,7 @@ void loop()
             ISRcom &= ~F_TIMELAG;                // clear time lag flag
           }
        }
-     }
+     } else log(WARN,__FUNCTION__,"timeNotSet");
   }
 
   // check if compensation minute has been requested
