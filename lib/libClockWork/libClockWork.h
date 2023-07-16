@@ -15,11 +15,11 @@
 #define USING_TIM_DIV256              false            // for longest timer but least accurate. Default
 
 #define HW_TIMER_INTERVAL           50L               // ms
-#define DUTYCYCLES                    6               // HW_TIMER_INTERVAL * DUTYCYCLES defines duty interval
+#define DUTYCYCLES                    3               // HW_TIMER_INTERVAL * DUTYCYCLES defines duty interval
 #define DEBOUNCE_INT                  5               // HW_TIMER_INTERVAL * DEBOUNCE_INT defines debounce interval for buttons 1 & 2
 #define BUTTON_LONG                  15               // HW_TIMER_INTERVAL * BUTTON_LONG defines time intervall for a long button press
 #define TIMER_INTERVAL_60S          60000L
-#define TIMER_INTERVAL_FASTF        499L              // roughly 500ms, prime number
+#define TIMER_INTERVAL_FASTF        249L              // roughly 249ms, prime number
 #define TIMER_INTERVAL_1000MS       1000L             // 1000ms
 
 // flags to communicate to and from ISR via "ISRcom"
@@ -51,6 +51,6 @@ void setClockHands(int from_hand_h, int from_hand_min, int to_hand_h, int to_han
 boolean syncClockWork();
 int minute_steps(int from_h, int from_min, int to_h, int to_min); // calculate the number steps needed between two times
 void CompensateMinute();
-void transformDHP(TimeElements &te, int defaultHour);
+void transformDHP(time_t &te, int defaultHour);
 int  hour2clockface(int hour_24);
 void logISR();
