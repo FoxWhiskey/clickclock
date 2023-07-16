@@ -8,7 +8,7 @@
 #include <WiFiUdp.h>
 #include "ntp.h"
 
-loglevel setloglevel = DEBUG;
+loglevel setloglevel = INFO;
 
 #define HOUR_HAND_DEFAULT 6       // the default position of hour hand
 #define  MIN_HAND_DEFAULT 23       // the default position of minute hand
@@ -62,12 +62,14 @@ void setup()
   while (timeStatus() == timeNotSet) {
     delay(100);
   } 
-  breakTime(now(),hand);
+
   digitalClockDisplay();
-  transformDHP(hand,HOUR_HAND_DEFAULT); // build a valid time element for current clockwork setting // bugfix issue #9
-  hand.Minute = MIN_HAND_DEFAULT;
-  tt_hands = makeTime(hand);            // set the current clockwork hand setting  // bugfix issue #9
-  log(INFO,__FUNCTION__,"Hand position at %02i:%02i",hour2clockface(hour(tt_hands)),minute(tt_hands));
+  breakTime(now(),hand);                // load current date into "hand"
+  hand.Minute = MIN_HAND_DEFAULT;       // set clockwork minute
+  hand.Second = 0;                      // set clockwork second  // bugfix issue #13
+  tt_hands = makeTime(hand);            // derive time_t object from "hand"  // bugfix issue #9
+  transformDHP(tt_hands,HOUR_HAND_DEFAULT); // modify "tt_hands" to represent current clockwork setting // bugfix issue #9
+  hand.Hour = hour2clockface(hour(tt_hands)); // then update clockwork hour
   // ********** timer interrupt setup **********
   setupInterrupts();
   // ********** synchronise clock work to system time and run clock
@@ -101,7 +103,7 @@ void loop()
             ISRcom &= ~F_MINUTE_EN;              // stop clockwork
             hand.Hour = hour(tt_hands);          // set default clockwork position
             hand.Minute = minute(tt_hands);      //  (comparable with system boot)
-            syncClockWork();                     // resync clockwork - assuming F_SEC00 is still set (!)
+            //syncClockWork();                     // resync clockwork - assuming F_SEC00 is still set (!)
           }
        }
      } else log(WARN,__FUNCTION__,"timeNotSet");

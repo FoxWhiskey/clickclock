@@ -13,7 +13,7 @@ volatile byte Btn1Cntr = 0;            //debounce counter button 1
 volatile byte Btn2Cntr = 0;            //debounce counter button 2
 //volatile byte ISRcom = 0|F_POLARITY;   // Polarity of first pulse
 volatile byte ISRcom = 0;                // Polarity of first pulse
-volatile byte ISRbtn = 0;              // state of buttons
+volatile byte ISRbtn = 0;                // state of buttons
 volatile uint ticks = 0;
 volatile byte sec00 = 0;
 volatile time_t tt_hands = 0;
@@ -287,15 +287,26 @@ void CompensateMinute() {
 }
 
 /**
- * @brief transforms a given default hand position of the clockwork drive to match the nearest "true" NTP time stamp. 
- * @brief TimeElements is altered accordingly. Needed once during system boot to set "tt_hands" correctly
- * @param TimeElements the present NTP time stamp
+ * @brief modifies a given time stamp, so that the new value represents the hand position of the clockwork drive
+ * @brief that is closest and _prior_ to the actual time.
+ * @brief The function expects the seconds-value set to zero and default minute hand position set correctly
+ * @brief Needed once during system boot to set "tt_hands"
+ * @param time_t time stamp to represent current hand position
  * @param int default hour hand position 
 */ 
-void transformDHP(TimeElements &te, int defaultHour) {
+void transformDHP(time_t &handstamp, int defaultHour) {
+ 
+ int current_hour = hour(handstamp);
+ int delta_hour = 0;
+ 
+ defaultHour += 12;                                        // set the hour to max possible value
+ delta_hour = defaultHour - current_hour;
+ while (delta_hour > 0) delta_hour -= 12;                     // make sure that time difference is negative
 
-    if (te.Hour > 12) te.Hour = (defaultHour % 12) + 12;
-    else te.Hour = defaultHour % 12;
+ handstamp += SECS_PER_HOUR * delta_hour;                  // and set handstamp to the closest time *prior* current time
+ log(DEBUG,__FUNCTION__,"Hand position set: tt_hands=%lld",handstamp);
+ log(INFO,__FUNCTION__,"fictional clockwork date is [%02i.%02i.%02i] %02i:%02i",day(handstamp),month(handstamp),year(handstamp),hour(handstamp),minute(handstamp));
+
 }
 
 /**
