@@ -21,6 +21,7 @@ extern WiFiUDP Udp;
 extern unsigned int localPort;
 time_t NTPsyncInterval = 1800;
 TimeElements hand;
+time_t systemstart = 0;
 extern time_t tt_hands;
 
 void setup()
@@ -63,6 +64,7 @@ void setup()
     delay(100);
   } 
 
+  systemstart = now();                  // store the first call to now() as system start
   digitalClockDisplay();
   breakTime(now(),hand);                // load current date into "hand"
   hand.Minute = MIN_HAND_DEFAULT;       // set clockwork minute
@@ -94,16 +96,14 @@ void loop()
        { // update the display only if time has changed
          prevDisplay = time_now;
          log(INFO,__FUNCTION__,"[%02i:%02i]: Hands at %02i:%02i",hour(prevDisplay),minute(prevDisplay),hour2clockface(hour(tt_hands)),minute(tt_hands));
+         log(DEBUG,__FUNCTION__,"delta_NTP is %is",time_now-tt_hands);
          /*
           * Test on time gap between systemtime/NTP and clockwork time - resync clockwork if needed
           */
-        if (abs(prevDisplay-tt_hands) > 60)   // if NTP and clockwork out of sync
+        if (abs(prevDisplay-tt_hands) > MAX_NTP_DEVIATION)   // if NTP and clockwork out of sync
           {
-            log(WARN,__FUNCTION__,"delta_t is %is Clockwork out of sync! Resyncing...",abs(prevDisplay-tt_hands));
+            log(WARN,__FUNCTION__,"delta_NTP is %is Clockwork out of sync! Resyncing...",abs(prevDisplay-tt_hands));
             ISRcom &= ~F_MINUTE_EN;              // stop clockwork
-            hand.Hour = hour(tt_hands);          // set default clockwork position
-            hand.Minute = minute(tt_hands);      //  (comparable with system boot)
-            //syncClockWork();                     // resync clockwork - assuming F_SEC00 is still set (!)
           }
        }
      } else log(WARN,__FUNCTION__,"timeNotSet");

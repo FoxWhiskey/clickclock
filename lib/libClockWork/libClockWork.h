@@ -21,6 +21,7 @@
 #define TIMER_INTERVAL_60S          60000L
 #define TIMER_INTERVAL_FASTF        249L              // roughly 249ms, prime number
 #define TIMER_INTERVAL_1000MS       1000L             // 1000ms
+#define MAX_NTP_DEVIATION             2               // maximum deviation between NTP-time and clockwork time
 
 // flags to communicate to and from ISR via "ISRcom"
 #define F_POLARITY               1      // polarity of drive pulse, false: negative, true: positive
