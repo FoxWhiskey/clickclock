@@ -21,7 +21,9 @@ extern WiFiUDP Udp;
 extern unsigned int localPort;
 time_t NTPsyncInterval = 1800;
 TimeElements hand;
-time_t systemstart = 0;
+unsigned long systemstart_millis = 0;
+time_t systemstart_date = 0;
+time_t delta_t = 0;
 extern time_t tt_hands;
 
 void setup()
@@ -64,7 +66,6 @@ void setup()
     delay(100);
   } 
 
-  systemstart = now();                  // store the first call to now() as system start
   digitalClockDisplay();
   breakTime(now(),hand);                // load current date into "hand"
   hand.Minute = MIN_HAND_DEFAULT;       // set clockwork minute
@@ -74,8 +75,10 @@ void setup()
   hand.Hour = hour2clockface(hour(tt_hands)); // then update clockwork hour
   // ********** timer interrupt setup **********
   setupInterrupts();
+  // ********** remember time stamps for time drift calculations
+  systemstart_date   = now();                  // system start  NTP date
+  systemstart_millis = millis();               // system start CPU clock date
   // ********** synchronise clock work to system time and run clock
-  ISRcom |= F_SEC00;                // this can ONLY be done during setup, as it immediately follows setupInterrupts() !!!
   syncClockWork();
   log(DEBUG,__FUNCTION__,"ISRcom: %i",int(ISRcom));
   log(INFO, __FUNCTION__, "%s", "clickclock-setup completed.");
@@ -88,6 +91,9 @@ void loop()
 {
   logISR();
   delay(200);
+  /*
+  *  On normal operation, output status information every minute (on second 0)
+  */
   if (ISRcom & F_SEC00) {
      if (timeStatus() != timeNotSet)
      {
@@ -95,15 +101,22 @@ void loop()
        if (time_now != prevDisplay)
        { // update the display only if time has changed
          prevDisplay = time_now;
-         log(INFO,__FUNCTION__,"[%02i:%02i]: Hands at %02i:%02i",hour(prevDisplay),minute(prevDisplay),hour2clockface(hour(tt_hands)),minute(tt_hands));
-         log(DEBUG,__FUNCTION__,"delta_NTP is %is",time_now-tt_hands);
+         delta_t = time_now-tt_hands; 
+         log(INFO,__FUNCTION__,"[%02i:%02i:%02i]: Hands at %02i:%02i",hour(prevDisplay),minute(prevDisplay),second(prevDisplay),hour2clockface(hour(tt_hands)),minute(tt_hands));
+         log(DEBUG,__FUNCTION__,"delta_NTP is %llds [%lld/%lld]",delta_t,time_now,tt_hands);
+         
          /*
           * Test on time gap between systemtime/NTP and clockwork time - resync clockwork if needed
           */
-        if (abs(prevDisplay-tt_hands) > MAX_NTP_DEVIATION)   // if NTP and clockwork out of sync
+        if (abs(delta_t) > MAX_NTP_DEVIATION)   // if NTP and clockwork out of sync
           {
-            log(WARN,__FUNCTION__,"delta_NTP is %is Clockwork out of sync! Resyncing...",abs(prevDisplay-tt_hands));
+            log(WARN,__FUNCTION__,"delta_NTP is %llds Clockwork out of sync! Resyncing...",prevDisplay-tt_hands);
             ISRcom &= ~F_MINUTE_EN;              // stop clockwork
+            ISRcom &= ~F_SEC00;                  // stop full minute indication
+            if (abs(delta_t > 59)) {                        // if deviation is 60sec and more (e.g. DST change, loss of NTP)
+               breakTime(tt_hands,hand);                    //    update "hand" and
+               if (syncClockWork()) ISRcom &= ~F_TIMELAG;   //    a run a standard clockwork-sync - clear timelag flag on success 
+            } else reSyncClockWork(delta_t);                // else handle time drift (deviation less than a minute)
           }
        }
      } else log(WARN,__FUNCTION__,"timeNotSet");
@@ -112,4 +125,15 @@ void loop()
   // check if compensation minute has been requested
   if (ISRbtn & F_BUTN1LONG) CompensateMinute();
   if ((ISRcom & F_CM_SET) && !(ISRcom & F_FSTFWD_EN)) ISRcom |= F_MINUTE_EN;
+
+  // check if time lag test function has been requested
+  #define TIMELAG -2     //negative value tweaks system time back in time (--> clockwork seems to be early)
+  if ((ISRbtn & F_BUTN2LONG) && !(ISRcom & F_TIMELAG)) {
+      ISRcom |= F_TIMELAG;
+      time_now = now();
+      log(INFO,__FUNCTION__,"Tweaking system time from %02i:%02i:%02i to %02i:%02i:%02i",hour(time_now),minute(time_now),second(time_now),hour(time_now+TIMELAG),minute(time_now+TIMELAG),second(time_now+TIMELAG));
+      if (dst(time_now)) setTime(time_now-3600 + TIMELAG);          // introduce time lag by tweaking clock hand position, consider DST !!!
+      else setTime(time_now+TIMELAG);
+  }
+
 }
