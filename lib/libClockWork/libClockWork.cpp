@@ -261,7 +261,6 @@ boolean reSyncClockWork(int lag) {
     if (lag > 0) setClockHands(hour(tt_hands),minute(tt_hands),hour(tt_hands+SECS_PER_MIN),minute(tt_hands+SECS_PER_MIN));
     // else do nothing (ISR sync is sufficient)
     ISRcom |= F_MINUTE_EN;   // enable clockwork
-    ISRcom &= ~F_TIMELAG;    // clear time lag indication
     
     return true;   
 };
@@ -343,5 +342,5 @@ int hour2clockface(int hour_24) {
 */
 void logISR() {
      
-          log(DEBUG,__FUNCTION__," %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |",ISRcom & F_INTRUN ? "F_INTRUN" : "        ",ISRcom & F_POLARITY ? "F_POLARITY" : "          ",ISRcom & F_POWER ? "F_POWER" : "       ",ISRcom & F_MINUTE_EN ? "F_MINUTE_EN" : "           ",ISRcom & F_FSTFWD_EN ? "F_FSTFWD_EN" : "           ",ISRcom & F_SEC00 ? "F_SEC00" : "       ",ISRcom & F_CM_SET ? "F_CM_SET" : "        ",ISRcom & F_TIMELAG ? "F_TIMELAG" : "         ",ISRbtn & F_BUTN1 ? "F_BUTN1" : "       ",ISRbtn & F_BUTN2 ? "F_BUTN2" : "       ",ISRbtn & F_BUTN1LONG ? "F_BUTN1LONG" : "           ",ISRbtn & F_BUTN2LONG ? "F_BUTN2LONG" : "           ");
+          log(DEBUG,__FUNCTION__," %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |",ISRcom & F_INTRUN ? "F_INTRUN" : "        ",ISRcom & F_POLARITY ? "F_POLARITY" : "          ",ISRcom & F_POWER ? "F_POWER" : "       ",ISRcom & F_MINUTE_EN ? "F_MINUTE_EN" : "           ",ISRcom & F_FSTFWD_EN ? "F_FSTFWD_EN" : "           ",ISRcom & F_SEC00 ? "F_SEC00" : "       ",ISRcom & F_CM_SET ? "F_CM_SET" : "        ",ISRbtn & F_BUTN1 ? "F_BUTN1" : "       ",ISRbtn & F_BUTN2 ? "F_BUTN2" : "       ",ISRbtn & F_BUTN1LONG ? "F_BUTN1LONG" : "           ",ISRbtn & F_BUTN2LONG ? "F_BUTN2LONG" : "           ");
 }

@@ -30,7 +30,7 @@
 #define F_FSTFWD_EN              8      // ISR 500ms-period enabled/disabled
 #define F_SEC00                 16      // true: system time second is [00], false: system time second is [01-59]
 #define F_CM_SET                32      // true: compensation minute set, false: not set      // issue #8
-#define F_TIMELAG               64      // time lag has been introduced and is being processed
+#define F_RFU1                  64      // RFU1
 #define F_INTRUN               128      // true: software timer interrupts are set up and running, false: minute/second timers not running
 
 // flags to signal button state

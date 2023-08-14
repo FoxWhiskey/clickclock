@@ -115,7 +115,7 @@ void loop()
             ISRcom &= ~F_SEC00;                  // stop full minute indication
             if (abs(delta_t > 59)) {                        // if deviation is 60sec and more (e.g. DST change, loss of NTP)
                breakTime(tt_hands,hand);                    //    update "hand" and
-               if (syncClockWork()) ISRcom &= ~F_TIMELAG;   //    a run a standard clockwork-sync - clear timelag flag on success 
+               syncClockWork();                             //    run a standard clockwork-sync
             } else reSyncClockWork(delta_t);                // else handle time drift (deviation less than a minute)
           }
        }
@@ -125,15 +125,5 @@ void loop()
   // check if compensation minute has been requested
   if (ISRbtn & F_BUTN1LONG) CompensateMinute();
   if ((ISRcom & F_CM_SET) && !(ISRcom & F_FSTFWD_EN)) ISRcom |= F_MINUTE_EN;
-
-  // check if time lag test function has been requested
-  #define TIMELAG -2     //negative value tweaks system time back in time (--> clockwork seems to be early)
-  if ((ISRbtn & F_BUTN2LONG) && !(ISRcom & F_TIMELAG)) {
-      ISRcom |= F_TIMELAG;
-      time_now = now();
-      log(INFO,__FUNCTION__,"Tweaking system time from %02i:%02i:%02i to %02i:%02i:%02i",hour(time_now),minute(time_now),second(time_now),hour(time_now+TIMELAG),minute(time_now+TIMELAG),second(time_now+TIMELAG));
-      if (dst(time_now)) setTime(time_now-3600 + TIMELAG);          // introduce time lag by tweaking clock hand position, consider DST !!!
-      else setTime(time_now+TIMELAG);
-  }
 
 }
