@@ -5,6 +5,8 @@
 
 ESP8266Timer ITimer;
 ESP8266_ISR_Timer ISR_Timer;
+int minute_id = 0;                      // the id of ISR_Minute_Trigger
+int sec_id = 0;                         // the id of ISR_Second_Trigger
 
 extern TimeElements hand;
 
@@ -136,27 +138,24 @@ void IRAM_ATTR TimerHandler()
 
 /**
  * @brief synchronise the minute trigger to system time, so that the ISR triggers on full minutes
- * @return returns false, if unable to get time
+ * @return always true
 */
 boolean sync_ISR_MinuteTrigger() {
 
-    int sec_now = 0;
-    time_t epoch = 0;
+   time_t epoch = now();
 
-    if (timeStatus() != timeNotSet) {
-        sec_now = second();
-        log(DEBUG,__FUNCTION__,"Current second is %02i. Syncing...",sec_now);
-        while (sec_now != 0) { 
-           delay(200);
-           if (timeStatus() != timeNotSet) sec_now = second();
-        };
-        ISR_Timer.setInterval(TIMER_INTERVAL_60S,ISR_MinuteTrigger);
-        ISR_Timer.setInterval(TIMER_INTERVAL_1000MS,ISR_SecondTrigger);
-        if (timeStatus() != timeNotSet) { 
-           epoch = now();
-           log(INFO,__FUNCTION__,"ISR synchronised with system time: %02i:%02i:%02i",hour(epoch),minute(epoch),second(epoch));
-         } else return false;
-    } else return false;
+    if (timeStatus() == timeNeedsSync) log(WARN,__FUNCTION__,"System time needs NTP-resync...");
+    log(INFO,__FUNCTION__,"Current second is %02i. Syncing...",second(epoch));
+    while (second(epoch) != 0) { 
+        delay(200);
+        epoch = now();
+    };
+    sec00 = 0;
+    minute_id = ISR_Timer.setInterval(TIMER_INTERVAL_60S,ISR_MinuteTrigger);
+    sec_id =    ISR_Timer.setInterval(TIMER_INTERVAL_1000MS,ISR_SecondTrigger);
+    ISRcom |= (F_INTRUN + F_SEC00);   // at this point in time we have synchronised both ISRs to full minute (second=0) of the hour. Flag ISR running and second==0
+    log(INFO,__FUNCTION__,"ISRs synchronised with system time: %02i:%02i:%02i",hour(epoch),minute(epoch),second(epoch));
+    
 return true;
 }
 
@@ -169,14 +168,9 @@ boolean setupInterrupts() {
 
     if (timerStart) {
         log(DEBUG,__FUNCTION__,"Starting ITimer");
-        if (!sync_ISR_MinuteTrigger()) {
-            log(FATAL,__FUNCTION__,"Cannot get system time! OMG!");
-            return false;
-        };
+        sync_ISR_MinuteTrigger();
         ISR_Timer.setInterval(TIMER_INTERVAL_FASTF,ISR_FastForward);
         log(DEBUG,__FUNCTION__,"ISR_FastForward timer started...");
-
-
 
     } else {
         log(FATAL,__FUNCTION__,"Can't start ITimer. Malfunction!");
@@ -204,15 +198,17 @@ void setClockHands(int from_hand_h, int from_hand_min, int to_hand_h, int to_han
 
    ticks = minute_steps(from_hand_h,from_hand_min,to_hand_h,to_hand_min);
    log(INFO,__FUNCTION__,"Setting clock hands from %02i:%02i to %02i:%02i (%i ticks)",from_hand_h,from_hand_min,to_hand_h,to_hand_min,ticks);
-   ISRcom &= ~F_MINUTE_EN;
-   ISRcom |= F_FSTFWD_EN;
+   if (ticks > 0) {
+      ISRcom &= ~F_MINUTE_EN;
+      ISRcom |= F_FSTFWD_EN;
+   };
 }                                        
 /**
  * @brief sync the clockwork to system time.
  * @brief Driving the hands may require more than 60s setting time,
  * @brief so an offset to the requested setting time needs to be considered.
  * @brief Setting of hands starts at second [00] of the minute to ensure maximum setting time!
- * @return true, if function is able to get system time, false otherwise
+ * @return always true
 */
 boolean syncClockWork() {
 
@@ -223,13 +219,8 @@ boolean syncClockWork() {
     
     log(INFO,__FUNCTION__,"Waiting for setting window...");
     while (!(ISRcom & F_SEC00)) delay(100);          // on F_SEC00,
-    if (timeStatus() != timeNotSet) {
-        systime = now();                             // get actual system time
-    } else {
-        log(FATAL,__FUNCTION__,"Cannot get system time! Ooops!");
-        return false;
-    }
-
+    if (timeStatus() == timeNeedsSync) log(WARN,__FUNCTION__,"System time needs NTP-resync...");
+    systime = now();
     clicks = minute_steps(hand.Hour,hand.Minute,hour(systime),minute(systime));
     if (clicks*int(TIMER_INTERVAL_FASTF)/1000 > 55) {
         offset = clicks*int(TIMER_INTERVAL_FASTF)/1000;  // bugfix issue #7
@@ -249,13 +240,39 @@ boolean syncClockWork() {
     return true;
 };
 
+/**
+ * @brief Triggers a resynchronisation of interrupt service routines to NTP time due to time drift of processor clock
+ * @brief when MAX_NTP_DEVIATION has been reached, stop and resync ISRs to NTP-time
+ * @brief must only be called when deviation is below 60secs (thus 1 minute/click)
+ * @param int negative value to indicate clockwork is early, positive value to indicate clockwork is late (NTP-time - clockwork-time)
+ * @return always true
+*/
+boolean reSyncClockWork(int lag) {
+    
+    log(WARN,__FUNCTION__,"Clockwork is %s",lag > 0 ? "late" : "early.");
+
+    ISR_Timer.deleteTimer(sec_id);
+    ISR_Timer.deleteTimer(minute_id);
+    ISRcom &= ~F_INTRUN;                  // flag not interrupt service routines are running 
+
+    sync_ISR_MinuteTrigger();             // re-sync the ISR routines to NTP time
+    
+    // if clockwork is late, drive clockwork by a single minute
+    if (lag > 0) setClockHands(hour(tt_hands),minute(tt_hands),hour(tt_hands+SECS_PER_MIN),minute(tt_hands+SECS_PER_MIN));
+    // else do nothing (ISR sync is sufficient)
+    ISRcom |= F_MINUTE_EN;   // enable clockwork
+    
+    return true;   
+};
+
+
 
 /**
  * @brief calculates the number of steps needed for the clockwork to move the hands between two time displays
  * @param int from_h the indicated hour [0-23]
  * @param int from_min the indicated minute [0-59]
  * @param int to_h the target hour [0-23]
- * @param int to_min the target minute [0-59]
+ * @param[in] int to_min the target minute [0-59]
  * @result int the number of clockwork clicks needed to set target display
 */
 int minute_steps(int from_h, int from_min, int to_h, int to_min) {
@@ -325,5 +342,5 @@ int hour2clockface(int hour_24) {
 */
 void logISR() {
      
-          log(DEBUG,__FUNCTION__," %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |",ISRcom & F_POLARITY ? "F_POLARITY" : "          ",ISRcom & F_POWER ? "F_POWER" : "       ",ISRcom & F_MINUTE_EN ? "F_MINUTE_EN" : "           ",ISRcom & F_FSTFWD_EN ? "F_FSTFWD_EN" : "           ",ISRcom & F_SEC00 ? "F_SEC00" : "       ",ISRcom & F_CM_SET ? "F_CM_SET" : "        ",ISRbtn & F_BUTN1 ? "F_BUTN1" : "       ",ISRbtn & F_BUTN2 ? "F_BUTN2" : "       ",ISRbtn & F_BUTN1LONG ? "F_BUTN1LONG" : "           ",ISRbtn & F_BUTN2LONG ? "F_BUTN2LONG" : "           ");
+          log(DEBUG,__FUNCTION__," %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |",ISRcom & F_INTRUN ? "F_INTRUN" : "        ",ISRcom & F_POLARITY ? "F_POLARITY" : "          ",ISRcom & F_POWER ? "F_POWER" : "       ",ISRcom & F_MINUTE_EN ? "F_MINUTE_EN" : "           ",ISRcom & F_FSTFWD_EN ? "F_FSTFWD_EN" : "           ",ISRcom & F_SEC00 ? "F_SEC00" : "       ",ISRcom & F_CM_SET ? "F_CM_SET" : "        ",ISRbtn & F_BUTN1 ? "F_BUTN1" : "       ",ISRbtn & F_BUTN2 ? "F_BUTN2" : "       ",ISRbtn & F_BUTN1LONG ? "F_BUTN1LONG" : "           ",ISRbtn & F_BUTN2LONG ? "F_BUTN2LONG" : "           ");
 }
