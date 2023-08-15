@@ -85,8 +85,9 @@ void setup()
   
 }
 
-time_t prevDisplay = 0;
-time_t time_now = 0;
+time_t time_NTP = 0;
+time_t prevHands = 0;
+time_t HandsNow = tt_hands;
 void loop()
 {
   logISR();
@@ -97,20 +98,20 @@ void loop()
   if (ISRcom & F_SEC00) {
      if (timeStatus() != timeNotSet)
      {
-       time_now = now();
-       if (time_now != prevDisplay)
-       { // update the display only if time has changed
-         prevDisplay = time_now;
-         delta_t = time_now-tt_hands; 
-         log(INFO,__FUNCTION__,"[%02i:%02i:%02i]: Hands at %02i:%02i",hour(prevDisplay),minute(prevDisplay),second(prevDisplay),hour2clockface(hour(tt_hands)),minute(tt_hands));
-         log(DEBUG,__FUNCTION__,"delta_NTP is %llds [%lld/%lld]",delta_t,time_now,tt_hands);
+       time_NTP = now();
+       if (HandsNow != prevHands)
+       { // update the display only if clockwork position has changed
+         prevHands = HandsNow;
+         delta_t = time_NTP-tt_hands; 
+         log(INFO,__FUNCTION__,"[%02i:%02i:%02i]: Hands at %02i:%02i",hour(time_NTP),minute(time_NTP),second(time_NTP),hour2clockface(hour(tt_hands)),minute(tt_hands));
+         log(DEBUG,__FUNCTION__,"delta_NTP is %llds [%lld/%lld]",delta_t,time_NTP,tt_hands);
          
          /*
           * Test on time gap between systemtime/NTP and clockwork time - resync clockwork if needed
           */
         if (abs(delta_t) > MAX_NTP_DEVIATION)   // if NTP and clockwork out of sync
           {
-            log(WARN,__FUNCTION__,"delta_NTP is %llds Clockwork out of sync! Resyncing...",prevDisplay-tt_hands);
+            log(WARN,__FUNCTION__,"delta_NTP is %llds Clockwork out of sync! Resyncing...",time_NTP-tt_hands);
             ISRcom &= ~F_MINUTE_EN;              // stop clockwork
             ISRcom &= ~F_SEC00;                  // stop full minute indication
             if (abs(delta_t > 59)) {                        // if deviation is 60sec and more (e.g. DST change, loss of NTP)
@@ -120,8 +121,9 @@ void loop()
           }
        }
      } else log(WARN,__FUNCTION__,"timeNotSet");
+     HandsNow = tt_hands;
   }
-
+  
   // check if compensation minute has been requested
   if (ISRbtn & F_BUTN1LONG) CompensateMinute();
   if ((ISRcom & F_CM_SET) && !(ISRcom & F_FSTFWD_EN)) ISRcom |= F_MINUTE_EN;
