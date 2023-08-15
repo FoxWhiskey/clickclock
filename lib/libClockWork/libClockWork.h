@@ -21,6 +21,7 @@
 #define TIMER_INTERVAL_60S          60000L
 #define TIMER_INTERVAL_FASTF        249L              // roughly 249ms, prime number
 #define TIMER_INTERVAL_1000MS       1000L             // 1000ms
+#define MAX_NTP_DEVIATION             2               // maximum deviation between NTP-time and clockwork time
 
 // flags to communicate to and from ISR via "ISRcom"
 #define F_POLARITY               1      // polarity of drive pulse, false: negative, true: positive
@@ -29,8 +30,8 @@
 #define F_FSTFWD_EN              8      // ISR 500ms-period enabled/disabled
 #define F_SEC00                 16      // true: system time second is [00], false: system time second is [01-59]
 #define F_CM_SET                32      // true: compensation minute set, false: not set      // issue #8
-#define F_RFU2                  64      // RFU
-#define F_RFU3                 128      // RFU
+#define F_RFU1                  64      // RFU1
+#define F_INTRUN               128      // true: software timer interrupts are set up and running, false: minute/second timers not running
 
 // flags to signal button state
 #define F_BUTN1                  1      // Button 1 pressed short (debounced)
@@ -49,6 +50,7 @@ extern volatile uint ticks;
 boolean setupInterrupts();           // start interrupt processing
 void setClockHands(int from_hand_h, int from_hand_min, int to_hand_h, int to_hand_min);                                         
 boolean syncClockWork();
+boolean reSyncClockWork(int lag);
 int minute_steps(int from_h, int from_min, int to_h, int to_min); // calculate the number steps needed between two times
 void CompensateMinute();
 void transformDHP(time_t &te, int defaultHour);
