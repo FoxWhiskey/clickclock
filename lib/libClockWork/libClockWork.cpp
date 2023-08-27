@@ -18,6 +18,7 @@ volatile byte ISRcom = 0;                // Polarity of first pulse
 volatile byte ISRbtn = 0;                // state of buttons
 volatile uint ticks = 0;
 volatile byte sec00 = 0;
+volatile byte LEDshift = 0;           // shift register variable to control LED
 volatile time_t tt_hands = 0;
 
 /**
@@ -63,11 +64,13 @@ void IRAM_ATTR ISR_MinuteTrigger() {
 */
 void IRAM_ATTR ISR_SecondTrigger() {
 
+    if (Btn1Cntr+Btn2Cntr == 0) LEDshift = B00000001; // indicate elapsed second only if no button is pressed
+                                                      // results in 50ms flash each second (at standard HW_TIMER_INTERVAL)
     sec00++;
     sec00 %= byte(60);
     if (sec00 == 0) ISRcom |= F_SEC00;
     else ISRcom &= ~F_SEC00;
-    digitalWrite(PIN_LED,sec00 % 2);
+    
 }
 
 /**
@@ -75,10 +78,15 @@ void IRAM_ATTR ISR_SecondTrigger() {
 */
 void IRAM_ATTR TimerHandler()
 {
+  // handle LED activity - implementing issue #4
+  // LED activity depends on bit pattern of LEDshift.
+
+    digitalWrite(LED_BUILTIN,~LEDshift & 1);    // invert bit 0 and write it to LED control register
+    LEDshift >>= 1;                             // shift LED register to the right by one 
+
   // check duty cycle counter
   // switch off clockwork drive, when HW_TIMER_INTERVAL * DUTYCYCLES is reached (50ms * 4 = 200ms)
 
- 
    if (ISRcom & F_POWER) DutyCycles++;  // increase DutyCycle counter if ISRs are enabled
    if (DutyCycles > DUTYCYCLES) {                        // if duty time has been reached,
         
@@ -95,27 +103,35 @@ void IRAM_ATTR TimerHandler()
     }
 
  // check buttons (distinguish between long and short press)
+ // and flash LED accordingly (> v1.1.3)
 
     if (!digitalRead(PIN_D6)) {                                 // if button pressed,
-        if (Btn1Cntr++ > BUTTON_LONG) ISRbtn |= F_BUTN1LONG;    // set F_BUTNxLONG, as soon as BUTTON_LONG cycles have been counted
+        if (Btn1Cntr++ > BUTTON_LONG) {                         // and BUTTON_LONG cycles have been counted,
+            if (!(ISRbtn & F_BUTN1LONG)) LEDshift = B00110011;  // load LED-indication pattern into LED-register (only on first pass)
+            ISRbtn |= F_BUTN1LONG;                              // and set F_BUTNxLONG
+        }
     }
     else {
         if (ISRbtn & F_BUTN1LONG) {                             // if button not pressed and  F_BUTN1LONG set
-            Btn1Cntr = 0;                                       // signal "button release"
+            Btn1Cntr = 0;                                       // signal "button release" (long press)
             ISRbtn &= ~ F_BUTN1LONG;
         }
         if (Btn1Cntr > DEBOUNCE_INT) {                          // if button is pressed and DEBOUNCE_INT have been counted
             Btn1Cntr--;                                         // keep flag set 
             ISRbtn |= F_BUTN1;
         }
-        else {
+        else {                                                  // if releasing button after "short press"
+           if (Btn1Cntr > 0) LEDshift = B00111111;              // load LED-indication pattern into LED-register (only on first pass)
            Btn1Cntr = 0;
-           ISRbtn &= ~F_BUTN1;
+           ISRbtn &= ~F_BUTN1;                                  // and signal "button release" (short press)
         };
     };
 
     if (!digitalRead(PIN_D7)) {
-        if (Btn2Cntr++ > BUTTON_LONG) ISRbtn |= F_BUTN2LONG;
+        if (Btn2Cntr++ > BUTTON_LONG) {
+            if (!(ISRbtn & F_BUTN2LONG)) LEDshift = B00110011; 
+             ISRbtn |= F_BUTN2LONG;
+        }
     }
     else {
         if (ISRbtn & F_BUTN2LONG) {
@@ -127,6 +143,7 @@ void IRAM_ATTR TimerHandler()
             ISRbtn |= F_BUTN2;
         }
         else {
+           if (Btn2Cntr > 0) LEDshift = B00111111;
            Btn2Cntr = 0;
            ISRbtn &= ~F_BUTN2;
         };
@@ -342,5 +359,5 @@ int hour2clockface(int hour_24) {
 */
 void logISR() {
      
-          log(DEBUG,__FUNCTION__," %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |",ISRcom & F_INTRUN ? "F_INTRUN" : "        ",ISRcom & F_POLARITY ? "F_POLARITY" : "          ",ISRcom & F_POWER ? "F_POWER" : "       ",ISRcom & F_MINUTE_EN ? "F_MINUTE_EN" : "           ",ISRcom & F_FSTFWD_EN ? "F_FSTFWD_EN" : "           ",ISRcom & F_SEC00 ? "F_SEC00" : "       ",ISRcom & F_CM_SET ? "F_CM_SET" : "        ",ISRbtn & F_BUTN1 ? "F_BUTN1" : "       ",ISRbtn & F_BUTN2 ? "F_BUTN2" : "       ",ISRbtn & F_BUTN1LONG ? "F_BUTN1LONG" : "           ",ISRbtn & F_BUTN2LONG ? "F_BUTN2LONG" : "           ");
+          log(DEBUG,__FUNCTION__," %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |",ISRcom & F_INTRUN ? "F_INTRUN" : "        ",ISRcom & F_POLARITY ? "F_POLARITY" : "          ",ISRcom & F_POWER ? "F_POWER" : "       ",ISRcom & F_MINUTE_EN ? "F_MINUTE_EN" : "           ",ISRcom & F_FSTFWD_EN ? "F_FSTFWD_EN" : "           ",ISRcom & F_SEC00 ? "F_SEC00" : "       ",ISRcom & F_CM_SET ? "F_CM_SET" : "        ",ISRbtn & F_BUTN1 ? "F_BUTN1" : "       ",ISRbtn & F_BUTN2 ? "F_BUTN2" : "       ",ISRbtn & F_BUTN1LONG ? "F_BUTN1LONG" : "           ",ISRbtn & F_BUTN2LONG ? "F_BUTN2LONG" : "           ");
 }
