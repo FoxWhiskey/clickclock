@@ -22,8 +22,9 @@ For a slave clockwork to turn its hands (or flip a digit platelet), a simple ele
 ## What are the features of `clickclock`
 * `clickclock` fetches the actual time over NTP and Wifi and sets the clockwork  hands accordingly
 * electrical impulses for the clockwork drive are generated on ESSP8266 timer1 interrupts.
-* the minute-based timer interrupt is synchronised to the first second of the (NTP-)minute. The minute hand is moved within the first 100ms of the minute. If the ISR is synchronised to NTP, the onboard LED begins flashing @ 0,5Hz.
+* the minute-based timer interrupt is synchronised to the first second of the (NTP-)minute. The minute hand is moved within the first 100ms of the minute. If the ISR is synchronised to NTP, the onboard LED indicates each second (1Hz flash, at a duty cycle of 50ms).
 * a basic mechanism to make the current hand position of the clockwork known to the software. Without knowledge of the hand position the correct time cannot be set automatically.
+* correct clockwork display by setting a _compensation minute_ (see below).
 * _fun with clocks_ - functions to help kids reading analogue clockworks (yet to be implemented)
 
 ## Software Setup
@@ -33,7 +34,7 @@ Enter WiFi-credentials and NTP-server address here
 Default pin assignments and timer interrupt relevant settings.
 ### `main.cpp`
 * `HOUR_HAND_DEFAULT` and `MINUTE_HAND_DEFAULT`   
-the intial position of the clockwork's hands at compiling time. Default value is 00:00.
+the intial position of the clockwork's hands at compiling time.
 * `loglevel` sets the serial loglevel to either of `{DEBUG,INFO,WARN,FATAL}`
 
 
@@ -63,7 +64,10 @@ The the very first version of `clickclock`.
 * ISR-routines to get the (debounced) states of two bush buttons connected to the ESP.
 ### v1.1.x
 * detect mismatch between system time (NTP) and indicated clockwork time. Needed at least twice a year when DST is de-/activated.
-* Trigger different functions when push buttons are pressed short or long
+* the code also detects _time drift_ caused by cpu-clock instabilities (temperature, bad designs, etc.).   
+If NTP time differs more than 2 seconds from clockwork time, the interrupt service routines will be resynchronised. See [tech note](#tech-notes) below.
+* Trigger different functions when push buttons are short pressed or long pressed
+* A _short press_ is acknowledged with a 300ms LED indication, a _long press_ with two 100ms flashes (standard `HW_TIMER_INTERVAL` of 50ms provided)
 * `BUTN_1` (long press) sets a compensation minute.   
 When the system is started, no information is available on the polarity of the last electrical pulse. When setting the clockwork to the current time, there is a 50% chance that the first pulse is sent with an unmatched polarity and the clockwork does not move the hands with the first pulse. As a consequence, the time display is set one minute late. So a manual input is required to compensate for the late time display. A compensation minute can only be set once.
 ## Tech Notes
@@ -74,6 +78,11 @@ Unfortunately the GITHUB-repository has been archived and new issues cannot be p
 
 3. For the clockwork to display local time, it was necessary to extend the [PaulStoffregen/Time][5] library with daylight saving time (DST) functionality. Not to reinvent the wheel, I have taken the maths from the execellent work of Andreas Spiess  @[SensorIOT/NTPtimeESP][6]. I highly recommend his YouTube-channel.   
 Find the (DST-)extended library here: [FoxWhiskey/Time_DST][7]
+
+4. During my tests I found, that the cpu clock of the ESP8266 is pretty unstable and also temperature-sensitive (to some extent at least).   
+The first long time test showed, that the board drifts away from NTP time unacceptably fast (about 2 seconds early per day, in my case).   
+`v1.1.3` (and greater) implements a simple mechanism to re-synchronise the relevant _ISRs_ to NTP-time, so that the clockwork is powered on time. An attentive clock-watcher therefore may notice a slightly longer or shorter (indicated) minute once in a while...   
+An adaptive way to account for the time drift will be implemented with `v1.3.x` and greater. See milestone on Github.
 ## Why is `clickclock` a _slave clock_ implementation?
 Err, well, the wording is misleading, to be honest! The software acutally implements a _mother clock_ :-).
 
