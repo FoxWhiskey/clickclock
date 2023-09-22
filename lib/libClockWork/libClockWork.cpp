@@ -325,21 +325,20 @@ void CompensateMinute() {
  * @brief that is closest and _prior_ to the actual time.
  * @brief The function expects the seconds-value set to zero and default minute hand position set correctly
  * @brief Needed once during system boot to set "tt_hands"
- * @param time_t time stamp to represent current hand position
  * @param int default hour hand position 
 */ 
-void transformDHP(time_t &handstamp, int defaultHour) {
+void transformDHP(int defaultHour) {
  
- int current_hour = hour(handstamp);
+ int current_hour = hour(tt_hands);
  int delta_hour = 0;
  
  defaultHour += 12;                                        // set the hour to max possible value
  delta_hour = defaultHour - current_hour;
  while (delta_hour > 0) delta_hour -= 12;                     // make sure that time difference is negative
 
- handstamp += SECS_PER_HOUR * delta_hour;                  // and set handstamp to the closest time *prior* current time
- log(DEBUG,__FUNCTION__,"Hand position set: tt_hands=%lld",handstamp);
- log(INFO,__FUNCTION__,"fictional clockwork date is [%02i.%02i.%02i] %02i:%02i",day(handstamp),month(handstamp),year(handstamp),hour(handstamp),minute(handstamp));
+ tt_hands += SECS_PER_HOUR * delta_hour;                  // and set handstamp to the closest time *prior* current time
+ log(DEBUG,__FUNCTION__,"Hand position set: tt_hands=%lld",tt_hands);
+ log(INFO,__FUNCTION__,"fictional clockwork date is [%02i.%02i.%02i] %02i:%02i",day(tt_hands),month(tt_hands),year(tt_hands),hour(tt_hands),minute(tt_hands));
 
 }
 

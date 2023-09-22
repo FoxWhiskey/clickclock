@@ -29,15 +29,18 @@ For a slave clockwork to turn its hands (or flip a digit platelet), a simple ele
 
 ## Software Setup
 ### `NTP/wificonfig.h`
-Enter WiFi-credentials and NTP-server address here
+Location for several system default constants such as Wifi credentials and other relevant data. All definitions in this file will be used by the _default constructor_ of `systemdata`-class, and can be altered with the `systemdata::collect()`-property in software. Required definitions are:
+* `HOSTNAME           `: hostname of system used when requesting IP-address
+* `SSID               `: the network SSID to connect to
+* `PASSWD             `: optional network password
+* `TIMEZONE`           : time zone of device (signed integer to specify hour offset to UTC, eg. 1 for Berlin/Paris)
+* `NTPSERVER          `: the NTP-server to poll
+* `NTPINTERVAL        `: interval in seconds to synchronise system time to NTP-time
+* `HOUR_HAND_DEFAULT  `: inital position of the clockwork's hour hand at boot 
+* `MINUTE_HOUR_DEFAULT`: initial position of the clockwork's minute hand at boot
+* `DEFAULTLEVEL       `: debug level of serial console, either of `{DEBUG,INFO,WARN,FATAL}`
 ### `libClockWork/libClockWork.h`
 Default pin assignments and timer interrupt relevant settings.
-### `main.cpp`
-* `HOUR_HAND_DEFAULT` and `MINUTE_HAND_DEFAULT`   
-the intial position of the clockwork's hands at compiling time.
-* `loglevel` sets the serial loglevel to either of `{DEBUG,INFO,WARN,FATAL}`
-
-
 
 ## Hardware setup
 Provided the DEBO DRV3 developer board is used, find the default connections from the diagram below. Default pins are defined in `libClockWork.h`.   
@@ -70,6 +73,11 @@ If NTP time differs more than 2 seconds from clockwork time, the interrupt servi
 * A _short press_ is acknowledged with a 300ms LED indication, a _long press_ with two 100ms flashes (standard `HW_TIMER_INTERVAL` of 50ms provided)
 * `BUTN_1` (long press) sets a compensation minute.   
 When the system is started, no information is available on the polarity of the last electrical pulse. When setting the clockwork to the current time, there is a 50% chance that the first pulse is sent with an unmatched polarity and the clockwork does not move the hands with the first pulse. As a consequence, the time display is set one minute late. So a manual input is required to compensate for the late time display. A compensation minute can only be set once.
+### v1.2.x
+* Append 2 last bytes of MAC-address to hostname by default to make devices distinguishable in the same WiFi-network.
+* Make important runtime data permanent in the system's EEPROM, most importantly flags from the `ISRcom`-register (polarity of the next pulse (`F_POLARITY`), state of compensation minute (`F_CM_SET`)) and the present clockwork hand setting (`tt_hands`). In order not to wear out the board's EEPROM-memory to fast, system state will only be stored upon user request (`BUTN_2`- long press). With a saved system state, the system can be switched off safely and will be able to resync to NTP-time on power-on without recompilation.
+* As of `v1.2.1`, due to the use EEPROM memory as initialisation data source, the code has undergone a greater rewrite: default constants will now be loaded by the _default constructor_ of the `systemdata`-class. To simplifly the definition of default constants, all default data will be provided by `wificonfig.h` (even, if not directly related to WiFi-data).
+
 ## Tech Notes
 1. The [IDUINO DEBO DRV3][2] is a two-channel stepper motor developer board based on the L298N H-bridge chip. The board does not only drive stepper motors, but also has the ability to convert the input voltage (5-35V) down to 5V to supply power to connected microcontroller boards. The voltage regulation circuit is based on the 78M05. While the IDUINO datasheets allow input voltages of up to 35V, the maximum input ratings of the 78M05 cannot be told clearly from the relevant datasheet and may be limited to 18V. As a matter of fact, connecting the DEBO DRV3 to an input voltage of 24V destroys the on-board 78M05 immediately. Due to pin compatibility, it is possible to replace the chip by an LM341, granting a maximum input voltage of 35V.
 

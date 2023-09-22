@@ -23,6 +23,9 @@
 #define TIMER_INTERVAL_1000MS       1000L             // 1000ms
 #define MAX_NTP_DEVIATION             2               // maximum deviation between NTP-time and clockwork time
 
+#define HOUR_HAND_DEFAULT 6                            // the default position of hour hand
+#define  MIN_HAND_DEFAULT 23                           // the default position of minute hand
+
 // flags to communicate to and from ISR via "ISRcom"
 #define F_POLARITY               1      // polarity of drive pulse, false: negative, true: positive
 #define F_POWER                  2      // power state of drive, false: power off, true: power on
@@ -46,6 +49,7 @@ extern ESP8266_ISR_Timer ISR_Timer;  // declaration of the global variable ISRTi
 extern volatile byte ISRcom;
 extern volatile byte ISRbtn;
 extern volatile uint ticks;
+extern volatile time_t tt_hands;
 
 boolean setupInterrupts();           // start interrupt processing
 void setClockHands(int from_hand_h, int from_hand_min, int to_hand_h, int to_hand_min);                                         
@@ -53,6 +57,6 @@ boolean syncClockWork();
 boolean reSyncClockWork(int lag);
 int minute_steps(int from_h, int from_min, int to_h, int to_min); // calculate the number steps needed between two times
 void CompensateMinute();
-void transformDHP(time_t &te, int defaultHour);
+void transformDHP(int defaultHour);
 int  hour2clockface(int hour_24);
 void logISR();

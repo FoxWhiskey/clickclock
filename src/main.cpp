@@ -2,32 +2,40 @@
 #include <log.h>
 #include <welcome.h>
 #include <TimeLib.h>
+#include <libsavestate.h>
 #include <libClockWork.h>
 #include <ESP8266_ISR_Timer.h>
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
 #include "ntp.h"
 
-loglevel setloglevel = INFO;
+loglevel setloglevel;                   // stores the loglevel of serial console. Loglevel can be set in 'wificonfig.h'
+time_t NTPsyncInterval;                 // stores the NTP-resync interval. Default value can be set in 'wificonfig.h'
 
-#define HOUR_HAND_DEFAULT 6       // the default position of hour hand
-#define  MIN_HAND_DEFAULT 23       // the default position of minute hand
-
-extern const char ssid[];
-extern const char pass[];
-extern const char ntpServerName[];
-extern const int timeZone;
+extern int8 timeZone;
+extern char* ntpServerName;
 extern WiFiUDP Udp;
 extern unsigned int localPort;
-time_t NTPsyncInterval = 1800;
 TimeElements hand;
 unsigned long systemstart_millis = 0;
 time_t systemstart_date = 0;
 time_t delta_t = 0;
-extern time_t tt_hands;
+byte* macptr;
+char* pStr = NULL;                      // a generic pointer to a char or an array of char
+char* pPass= NULL;                      // a second generic pointer to a char or an array of char
+char hostname[MAX_HOSTNAME_S]="";       // char array (cstring) to store hostname
+byte  mac[2] = {0,0};                   // array to store least two bytes of MAC-address
+systemdata systemstate;       
 
 void setup()
 {
+  // ******** restore system data from EEPROM ********
+  systemstate.get(setloglevel);                // restore loglevel
+  systemstate.get(NTPsyncInterval);            // restore NTP-interval
+  systemstate.get(timeZone);                   // restore time zone
+  systemstate.get_flags();                     // restore F_POLARITY and F_CM_SET of ISRcom
+  systemstate.get(NTPSVR,ntpServerName);       // restore NTPSERVER 
+  // ******** Start serial console  ******************
   Serial.begin(115200);
   welcome();
   // ******** set outputs *********************
@@ -42,15 +50,29 @@ void setup()
   digitalWrite(PIN_D2,HIGH);
   digitalWrite(PIN_D5,HIGH);
   digitalWrite(PIN_LED,HIGH);
-  // ******** WiFi Setup ********************** 
-  WiFi.hostname("clickclock");
-  WiFi.begin(ssid, pass);
-  log(INFO, __FUNCTION__, "Connecting to %s", ssid);
+  // ******** get system state from EEPROM ****
+  log(DEBUG,__FUNCTION__,"Size of systemstate: %i",sizeof(systemdata));
+  systemstate.status();
+  // ******** WiFi Setup **********************
+  macptr = new byte[WL_MAC_ADDR_LENGTH];                // dynamically allocate memory to get last 2 bytes of MAC-address
+  WiFi.macAddress(macptr);                              // get MAC-address
+  mac[0] = macptr[4];                                   // copy last two bytes
+  mac[1] = macptr[5];
+  delete[] macptr;                                      // free memory
+  pStr = hostname;
+  systemstate.get(HOSTNAME_MAC,pStr);
+  log(INFO,__FUNCTION__,"Hostname is %s",hostname);
+  WiFi.hostname(hostname);
+  systemstate.get(SSId,pStr);
+  systemstate.get(PASS,pPass);
+  WiFi.begin(pStr, pPass);
+  log(INFO, __FUNCTION__, "Connecting to \'%s\', with hostname \'%s\'.", pStr, hostname);
   while (WiFi.status() != WL_CONNECTED)
   {
     delay(500);
     log(DEBUG,__FUNCTION__,"Waiting...");
   };
+  log(DEBUG,__FUNCTION__,"MAC tail is %02x%02x",mac[0],mac[1]);
   log(INFO, __FUNCTION__, "Connect! IP-Address is %s", WiFi.localIP().toString().c_str());
 
   // ********** NTP & time setup **************
@@ -71,7 +93,7 @@ void setup()
   hand.Minute = MIN_HAND_DEFAULT;       // set clockwork minute
   hand.Second = 0;                      // set clockwork second  // bugfix issue #13
   tt_hands = makeTime(hand);            // derive time_t object from "hand"  // bugfix issue #9
-  transformDHP(tt_hands,HOUR_HAND_DEFAULT); // modify "tt_hands" to represent current clockwork setting // bugfix issue #9
+  transformDHP(HOUR_HAND_DEFAULT);      // modify "tt_hands" to represent current clockwork setting // bugfix issue #9
   hand.Hour = hour2clockface(hour(tt_hands)); // then update clockwork hour
   // ********** timer interrupt setup **********
   setupInterrupts();
