@@ -33,12 +33,14 @@ Location for several system default constants such as Wifi credentials and other
 * `HOSTNAME           `: hostname of system used when requesting IP-address
 * `SSID               `: the network SSID to connect to
 * `PASSWD             `: optional network password
-* `TIMEZONE`           : time zone of device (signed integer to specify hour offset to UTC, eg. 1 for Berlin/Paris)
+* `TIMEZONE           `: time zone of device (signed integer to specify hour offset to UTC, eg. 1 for Berlin/Paris)
 * `NTPSERVER          `: the NTP-server to poll
 * `NTPINTERVAL        `: interval in seconds to synchronise system time to NTP-time
-* `HOUR_HAND_DEFAULT  `: inital position of the clockwork's hour hand at boot 
+* `HOUR_HAND_DEFAULT  `: inital position of the clockwork's hour hand at boot.
 * `MINUTE_HOUR_DEFAULT`: initial position of the clockwork's minute hand at boot
-* `DEFAULTLEVEL       `: debug level of serial console, either of `{DEBUG,INFO,WARN,FATAL}`
+* `DEFAULTLEVEL       `: debug level of serial console, either of `{DEBUG,INFO,WARN,FATAL}`   
+
+Note, that as of `v1.2.1` the current clockwork setting will be saved in system EEPROM on long press of `BUTN_2`. The system can be powered off safely and will be able to set the correct time (connected to the same clockwork) without recompiling the code.
 ### `libClockWork/libClockWork.h`
 Default pin assignments and timer interrupt relevant settings.
 
@@ -47,16 +49,16 @@ Provided the DEBO DRV3 developer board is used, find the default connections fro
 ```
 BUTTON       ESP8266       DEBO DRV3    CLOCKWORK
 
-               D1    <-->   IN1
-               D2    <-->   IN2
-               D5    <-->   ENA
- BUT1  <-->    D6
- BUT2  <-->    D7
-                            MOTORA 1  <-->  1
-                            MOTORA 2  <-->  2
-               5V    <-->   5V
- BUTx  <-->    GND   <-->   GND
-                            VMS (24VDC)  
+                D1    <-->   IN1
+                D2    <-->   IN2
+                D5    <-->   ENA
+BUTN_1  <-->    D6
+BUTN_2  <-->    D7
+                             MOTORA 1  <-->  1
+                             MOTORA 2  <-->  2
+                5V    <-->   5V
+BUTN_x  <-->    GND   <-->   GND
+                             VMS (24VDC)  
 ```
 
 ## Software versions
@@ -75,7 +77,8 @@ If NTP time differs more than 2 seconds from clockwork time, the interrupt servi
 When the system is started, no information is available on the polarity of the last electrical pulse. When setting the clockwork to the current time, there is a 50% chance that the first pulse is sent with an unmatched polarity and the clockwork does not move the hands with the first pulse. As a consequence, the time display is set one minute late. So a manual input is required to compensate for the late time display. A compensation minute can only be set once.
 ### v1.2.x
 * Append 2 last bytes of MAC-address to hostname by default to make devices distinguishable in the same WiFi-network.
-* Make important runtime data permanent in the system's EEPROM, most importantly flags from the `ISRcom`-register (polarity of the next pulse (`F_POLARITY`), state of compensation minute (`F_CM_SET`)) and the present clockwork hand setting (`tt_hands`). In order not to wear out the board's EEPROM-memory to fast, system state will only be stored upon user request (`BUTN_2`- long press). With a saved system state, the system can be switched off safely and will be able to resync to NTP-time on power-on without recompilation.
+* Make important runtime data permanent in the system's EEPROM, most importantly flags from the `ISRcom`-register (polarity of the next pulse (`F_POLARITY`), state of compensation minute (`F_CM_SET`)) and the present clockwork hand setting (`tt_hands`). In order not to wear out the board's EEPROM-memory to fast, system state will only be stored upon user request (`BUTN_2`- long press). When system state is saved, the **clockwork will be halted**, so that the system can be switched off safely.   
+On a reboot, connected to the same clockwork, the system will be able to resync to NTP-time without recompilation or any other user action.
 * As of `v1.2.1`, due to the use EEPROM memory as initialisation data source, the code has undergone a greater rewrite: default constants will now be loaded by the _default constructor_ of the `systemdata`-class. To simplifly the definition of default constants, all default data will be provided by `wificonfig.h` (even, if not directly related to WiFi-data).
 
 ## Tech Notes
@@ -84,7 +87,7 @@ When the system is started, no information is available on the polarity of the l
 2. After a couple of frustrating and unexplicable system crashes I found that the library documentation of [khoih-prog/ESP8266TimerInterrupt][3] is incomplete. The [ESP8266 interrupt handling documentation][4] states, that all interrupt service routines (ISR) need to be defined with the attribute `IRAM_ATTR`. This also applies for all functions called from the ISR itself. However, all examples based on the _ISR-based Timer_ lack the `IRAM_ATTR`-attribute!  
 Unfortunately the GITHUB-repository has been archived and new issues cannot be posted.
 
-3. For the clockwork to display local time, it was necessary to extend the [PaulStoffregen/Time][5] library with daylight saving time (DST) functionality. Not to reinvent the wheel, I have taken the maths from the execellent work of Andreas Spiess  @[SensorIOT/NTPtimeESP][6]. I highly recommend his YouTube-channel.   
+3. For the clockwork to display local time, it was necessary to extend the [PaulStoffregen/Time][5] library with daylight saving time (DST) functionality. Not to reinvent the wheel, I have taken the maths from the excellent work of Andreas Spiess  @[SensorIOT/NTPtimeESP][6]. I highly recommend his YouTube-channel.   
 Find the (DST-)extended library here: [FoxWhiskey/Time_DST][7]
 
 4. During my tests I found, that the cpu clock of the ESP8266 is pretty unstable and also temperature-sensitive (to some extent at least).   

@@ -89,12 +89,12 @@ void setup()
   } 
 
   digitalClockDisplay();
-  breakTime(now(),hand);                // load current date into "hand"
-  hand.Minute = MIN_HAND_DEFAULT;       // set clockwork minute
-  hand.Second = 0;                      // set clockwork second  // bugfix issue #13
-  tt_hands = makeTime(hand);            // derive time_t object from "hand"  // bugfix issue #9
-  transformDHP(HOUR_HAND_DEFAULT);      // modify "tt_hands" to represent current clockwork setting // bugfix issue #9
-  hand.Hour = hour2clockface(hour(tt_hands)); // then update clockwork hour
+  breakTime(now(),hand);                           // load current date into "hand"
+  hand.Minute = systemstate.get_hand(HANDMINUTE);  // set clockwork minute
+  hand.Second = 0;                                 // set clockwork second  // bugfix issue #13
+  tt_hands = makeTime(hand);                       // derive time_t object from "hand"  // bugfix issue #9
+  transformDHP(systemstate.get_hand(HANDHOUR));    // modify "tt_hands" to represent current clockwork setting // bugfix issue #9
+  hand.Hour = hour2clockface(hour(tt_hands));      // then update clockwork hour
   // ********** timer interrupt setup **********
   setupInterrupts();
   // ********** remember time stamps for time drift calculations
@@ -131,7 +131,7 @@ void loop()
          /*
           * Test on time gap between systemtime/NTP and clockwork time - resync clockwork if needed
           */
-        if (abs(delta_t) > MAX_NTP_DEVIATION)   // if NTP and clockwork out of sync
+        if ((abs(delta_t) > MAX_NTP_DEVIATION) && (ISRcom & F_MINUTE_EN))   // if NTP and clockwork out of sync
           {
             log(WARN,__FUNCTION__,"delta_NTP is %llds Clockwork out of sync! Resyncing...",time_NTP-tt_hands);
             ISRcom &= ~F_MINUTE_EN;              // stop clockwork
@@ -149,5 +149,16 @@ void loop()
   // check if compensation minute has been requested
   if (ISRbtn & F_BUTN1LONG) CompensateMinute();
   if ((ISRcom & F_CM_SET) && !(ISRcom & F_FSTFWD_EN)) ISRcom |= F_MINUTE_EN;
+
+  // store system data in EEPROM and halt clockwork
+  if (ISRbtn & F_BUTN2LONG && !(ISRcom & F_SAFE)) {
+   
+    systemstate.collect();
+    systemstate.write();
+    ISRcom &= ~F_MINUTE_EN;
+    ISRcom |= F_SAFE;
+    systemstate.status();
+    log(WARN,__FUNCTION__,"System state saved! CLOCKWORK HALTED! You may now power off!");
+  }
 
 }

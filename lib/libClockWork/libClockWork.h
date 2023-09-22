@@ -23,9 +23,10 @@
 #define TIMER_INTERVAL_1000MS       1000L             // 1000ms
 #define MAX_NTP_DEVIATION             2               // maximum deviation between NTP-time and clockwork time
 
-#define HOUR_HAND_DEFAULT 6                            // the default position of hour hand
-#define  MIN_HAND_DEFAULT 23                           // the default position of minute hand
-
+#ifndef HOUR_HAND_DEFAULT
+  #define HOUR_HAND_DEFAULT 0                            // the default position of hour hand
+  #define  MIN_HAND_DEFAULT 0                            // the default position of minute hand
+#endif
 // flags to communicate to and from ISR via "ISRcom"
 #define F_POLARITY               1      // polarity of drive pulse, false: negative, true: positive
 #define F_POWER                  2      // power state of drive, false: power off, true: power on
@@ -33,7 +34,7 @@
 #define F_FSTFWD_EN              8      // ISR 500ms-period enabled/disabled
 #define F_SEC00                 16      // true: system time second is [00], false: system time second is [01-59]
 #define F_CM_SET                32      // true: compensation minute set, false: not set      // issue #8
-#define F_RFU1                  64      // RFU1
+#define F_SAFE                  64      // true: system state has been saved, system can be powered down
 #define F_INTRUN               128      // true: software timer interrupts are set up and running, false: minute/second timers not running
 
 // flags to signal button state
