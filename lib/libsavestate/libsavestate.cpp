@@ -9,6 +9,7 @@
 extern byte mac[2];
 extern loglevel setloglevel;
 extern int8 timeZone;
+extern int16_t drift;
 
 /**
  * @brief standard constructor, will load default values into systemdata object, 
@@ -88,7 +89,6 @@ return 0;
 */
 uint8_t systemdata::get_hand(get_service get_type) {
 
-    EEPROM.get(0,*this);
     switch (get_type)
     {
     case HANDHOUR:
@@ -107,7 +107,6 @@ return -1;
  * @brief return ISRcom flags from EEPROM and set ISRcom accordingly
 */
 void systemdata::get_flags() {
-    
 
     if (_ISRcom & F_POLARITY) ISRcom |= F_POLARITY;
     else ISRcom &= ~F_POLARITY;
@@ -117,12 +116,13 @@ void systemdata::get_flags() {
 }
 
 /**
- * @brief return drift data from EEPROM
+ * @brief returns the virtual millisecond (in µs) for this system, which is the "base" for the
+ * @brief interval time of Timer1 interrupt service routine. If '_drift' is positive (negative),
+ * @brief the clock is late and the interrupt frequency must be set higher (lower). 
 */
-uint16_t systemdata::get_drift() {
-
-    EEPROM.get(0,*this);
-    return _drift;
+void systemdata::get(uint16_t& data) {
+    
+    data = uint16_t(1000 -_drift);
 }
 
 /**
@@ -155,7 +155,8 @@ void systemdata::get(int8 &data) {
 */
 void systemdata::status() {
 
-    log(INFO,__FUNCTION__,"EEPROM: systemstate is of size %iB. %i%% EEPROM memory used.",sizeof(*this),EEPROM.percentUsed());
+    if (EEPROM.percentUsed() < 0) log(WARN,__FUNCTION__,"EEPROM: systemstate has not been stored yet.");
+    else log(INFO,__FUNCTION__,"EEPROM: systemstate is of size %iB. %i%% EEPROM memory used.",sizeof(*this),EEPROM.percentUsed());
 }
 
 
@@ -169,6 +170,7 @@ void systemdata::collect(){
     _ISRcom = ISRcom;
     _setloglevel = setloglevel;
     _timezone = timeZone;
+    _drift = drift;
 
     EEPROM.put(0,*this);
 }

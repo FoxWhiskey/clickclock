@@ -26,7 +26,7 @@ class systemdata
         int get(get_service get_type,char* &data);  
         uint8_t get_hand(get_service get_type);
         void get_flags();
-        uint16_t get_drift();
+        void get(uint16_t& data);
         void get(loglevel& data);
         void get(time_t& data);
         void get(int8& data);
@@ -41,6 +41,6 @@ class systemdata
         char _pass[MAX_PW_SIZE];                 // password (WiFi)                                (24 bytes)
         char _hostname[MAX_HOSTNAME_S];          // hostname of clickclock board                   (19 bytes)
         char _ntpserver[MAX_HOSTNAME_S];         // hostname of NTPserver                          (19 bytes)
-        uint16_t _drift;                         // adaptive drift offset (yet to be implemented)  (2 bytes)
+        int16_t  _drift;                         // adaptive drift offset                          (2 bytes)
 
 };

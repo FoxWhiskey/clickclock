@@ -94,6 +94,9 @@ Find the (DST-)extended library here: [FoxWhiskey/Time_DST][7]
 The first long time test showed, that the board drifts away from NTP time unacceptably fast (about 2 seconds early per day, in my case).   
 `v1.1.3` (and greater) implements a simple mechanism to re-synchronise the relevant _ISRs_ to NTP-time, so that the clockwork is powered on time. An attentive clock-watcher therefore may notice a slightly longer or shorter (indicated) minute once in a while...   
 An adaptive way to account for the time drift will be implemented with `v1.3.x` and greater. See milestone on Github.
+
+5. Note, that flashing the ESP8266 with a new version of `clickclock` (or other firmware) does not erase `systemdata` stored in EEPROM. If you need default values to be considered on boot (those in `wificonfig.h`), flash memory of the system must be erased completely before flashing new firmware.   
+Close any monitor windows of _PlatfomIO_ and press "_Erase Flash_" in the PlatformIO-view of _vscode_.
 ## Why is `clickclock` a _slave clock_ implementation?
 Err, well, the wording is misleading, to be honest! The software acutally implements a _mother clock_ :-).
 

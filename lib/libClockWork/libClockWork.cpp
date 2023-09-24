@@ -7,6 +7,7 @@ ESP8266Timer ITimer;
 ESP8266_ISR_Timer ISR_Timer;
 int minute_id = 0;                      // the id of ISR_Minute_Trigger
 int sec_id = 0;                         // the id of ISR_Second_Trigger
+uint16 virt_ms = 1000;                  // value representing a true millisecond based on multiple microseconds (virtual millisecond)
 
 extern TimeElements hand;
 
@@ -181,10 +182,10 @@ return true;
  * @brief set up Interrupt handling for clockwork operations
 */
 boolean setupInterrupts() {
-    boolean timerStart = ITimer.attachInterruptInterval(HW_TIMER_INTERVAL*1000,TimerHandler);
+    boolean timerStart = ITimer.attachInterruptInterval(HW_TIMER_INTERVAL*virt_ms,TimerHandler);
 
     if (timerStart) {
-        log(DEBUG,__FUNCTION__,"Starting ITimer");
+        log(DEBUG,__FUNCTION__,"Starting ITimer, virtual ms is %iµs",virt_ms);
         sync_ISR_MinuteTrigger();
         ISR_Timer.setInterval(TIMER_INTERVAL_FASTF,ISR_FastForward);
         log(DEBUG,__FUNCTION__,"ISR_FastForward timer started...");
@@ -262,24 +263,43 @@ boolean syncClockWork() {
  * @brief when MAX_NTP_DEVIATION has been reached, stop and resync ISRs to NTP-time
  * @brief must only be called when deviation is below 60secs (thus 1 minute/click)
  * @param int negative value to indicate clockwork is early, positive value to indicate clockwork is late (NTP-time - clockwork-time)
+ * @param ulong millis-value on calling this function
+ * @param ulong& millis value when interrupts have been resynced last time
  * @return always true
 */
-boolean reSyncClockWork(int lag) {
+int16_t reSyncClockWork(int lag,u_long millis_now,u_long& millis_start) {
+    
+    int16_t _drift;
     
     log(WARN,__FUNCTION__,"Clockwork is %s",lag > 0 ? "late" : "early.");
 
+    /* the return value of millis() provides sufficient storage for a time period of roughly 50 days (based on milliseconds).
+       When the maximum value has been reached, millis() starts over and returns values starting at 0. To calculate the proper
+       time span between two resync-intervals, a potential overrun has to be considered and taken care of.
+       The size of 'ulong' also determines the smallest drift correction value of MAX_NTP_DEVIATION/50 days.
+       An oscillator time drift smaller than this value cannot be compensated for without more complex code.
+    */
+    if ((millis_now - millis_start) > 0) {                              // no overrun !
+        _drift = 1000000L*lag/((millis_now-millis_start)/60000L);
+    } else {                                                            // overrun has occured
+        _drift = 1000000L*lag/((0xFFFFFFFF-millis_start+millis_now)/60000L);
+    }
+    virt_ms = (virt_ms+(1000-_drift))/2;   // approximation by arithmetic mean
+    log(INFO,__FUNCTION__,"Calculated drift is %iµs, new virtual ms will be set to %iµs",_drift,virt_ms);
     ISR_Timer.deleteTimer(sec_id);
     ISR_Timer.deleteTimer(minute_id);
-    ISRcom &= ~F_INTRUN;                  // flag not interrupt service routines are running 
+    ISRcom &= ~F_INTRUN;                   // flag no interrupt service routines are running
+    ITimer.detachInterrupt();              // stop entire interrupt handling
+    //sync_ISR_MinuteTrigger();            // re-sync the ISR routines to NTP time
+    setupInterrupts();                     // restart interrupt handling
+    millis_start = millis();               // reset millis since last resync
 
-    sync_ISR_MinuteTrigger();             // re-sync the ISR routines to NTP time
-    
     // if clockwork is late, drive clockwork by a single minute
     if (lag > 0) setClockHands(hour(tt_hands),minute(tt_hands),hour(tt_hands+SECS_PER_MIN),minute(tt_hands+SECS_PER_MIN));
     // else do nothing (ISR sync is sufficient)
     ISRcom |= F_MINUTE_EN;   // enable clockwork
     
-    return true;   
+    return _drift;   
 };
 
 

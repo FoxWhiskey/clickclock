@@ -16,6 +16,7 @@ extern int8 timeZone;
 extern char* ntpServerName;
 extern WiFiUDP Udp;
 extern unsigned int localPort;
+extern uint16 virt_ms;
 TimeElements hand;
 unsigned long systemstart_millis = 0;
 time_t systemstart_date = 0;
@@ -25,6 +26,7 @@ char* pStr = NULL;                      // a generic pointer to a char or an arr
 char* pPass= NULL;                      // a second generic pointer to a char or an array of char
 char hostname[MAX_HOSTNAME_S]="";       // char array (cstring) to store hostname
 byte  mac[2] = {0,0};                   // array to store least two bytes of MAC-address
+int16_t drift;                          // adaptive drift;
 systemdata systemstate;       
 
 void setup()
@@ -35,9 +37,12 @@ void setup()
   systemstate.get(timeZone);                   // restore time zone
   systemstate.get_flags();                     // restore F_POLARITY and F_CM_SET of ISRcom
   systemstate.get(NTPSVR,ntpServerName);       // restore NTPSERVER 
+  systemstate.get(virt_ms);                    // restore virtual millisecond to compensate for osciallator drift
   // ******** Start serial console  ******************
   Serial.begin(115200);
   welcome();
+  log(DEBUG,__FUNCTION__,"Size of systemdata-class: %i",sizeof(systemdata));
+  systemstate.status();
   // ******** set outputs *********************
   pinMode(PIN_D1,OUTPUT);
   pinMode(PIN_D2,OUTPUT);
@@ -50,9 +55,6 @@ void setup()
   digitalWrite(PIN_D2,HIGH);
   digitalWrite(PIN_D5,HIGH);
   digitalWrite(PIN_LED,HIGH);
-  // ******** get system state from EEPROM ****
-  log(DEBUG,__FUNCTION__,"Size of systemstate: %i",sizeof(systemdata));
-  systemstate.status();
   // ******** WiFi Setup **********************
   macptr = new byte[WL_MAC_ADDR_LENGTH];                // dynamically allocate memory to get last 2 bytes of MAC-address
   WiFi.macAddress(macptr);                              // get MAC-address
@@ -134,12 +136,16 @@ void loop()
         if ((abs(delta_t) > MAX_NTP_DEVIATION) && (ISRcom & F_MINUTE_EN))   // if NTP and clockwork out of sync
           {
             log(WARN,__FUNCTION__,"delta_NTP is %llds Clockwork out of sync! Resyncing...",time_NTP-tt_hands);
-            ISRcom &= ~F_MINUTE_EN;              // stop clockwork
-            ISRcom &= ~F_SEC00;                  // stop full minute indication
-            if (abs(delta_t > 59)) {                        // if deviation is 60sec and more (e.g. DST change, loss of NTP)
-               breakTime(tt_hands,hand);                    //    update "hand" and
-               syncClockWork();                             //    run a standard clockwork-sync
-            } else reSyncClockWork(delta_t);                // else handle time drift (deviation less than a minute)
+            ISRcom &= ~F_MINUTE_EN;                                         // stop clockwork
+            ISRcom &= ~F_SEC00;                                             // stop full minute indication
+            if (abs(delta_t > 59)) {                                        // if deviation is 60sec and more (e.g. DST change, loss of NTP)
+               breakTime(tt_hands,hand);                                    // update "hand" and
+               syncClockWork();                                             //    run a standard clockwork-sync
+            } else {
+               drift = reSyncClockWork(delta_t,millis(),systemstart_millis);    // else handle time drift (deviation less than a minute)
+               systemstate.collect();                                       // collect new drift value
+               systemstate.write();                                         // and store it in EEPROM
+            } 
           }
        }
      } else log(WARN,__FUNCTION__,"timeNotSet");
