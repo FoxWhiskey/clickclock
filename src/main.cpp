@@ -37,7 +37,8 @@ void setup()
   systemstate.get(timeZone);                   // restore time zone
   systemstate.get_flags();                     // restore F_POLARITY and F_CM_SET of ISRcom
   systemstate.get(NTPSVR,ntpServerName);       // restore NTPSERVER 
-  systemstate.get(virt_ms);                    // restore virtual millisecond to compensate for osciallator drift
+    //systemstate.get(virt_ms);                    // restore virtual millisecond to compensate for osciallator drift
+    // switched off for debugging purposes...
   // ******** Start serial console  ******************
   Serial.begin(115200);
   welcome();
@@ -114,7 +115,7 @@ time_t prevHands = 0;
 time_t HandsNow = tt_hands;
 void loop()
 {
-  logISR();
+  //logISR(); temporarily switched off
   delay(200);
   /*
   *  On normal operation, output status information every minute (on second 0)
@@ -166,5 +167,9 @@ void loop()
     systemstate.status();
     log(WARN,__FUNCTION__,"System state saved! CLOCKWORK HALTED! You may now power off!");
   }
-
+    if ((ISRbtn & F_BUTN2) && !(ISRbtn & F_TIMELAG)) {
+    ISRbtn |= F_TIMELAG;          // set F_TIMELAG
+    log(INFO,__FUNCTION__,"Faking true hand position from %02i:%02i:%02i to %02i:%02i:%02i",hour(tt_hands),minute(tt_hands),second(tt_hands),hour(tt_hands-2),minute(tt_hands-2),second(tt_hands-2));
+    tt_hands -= 2;             // introduce time lag by tweaking clock hand position
+    }
 }

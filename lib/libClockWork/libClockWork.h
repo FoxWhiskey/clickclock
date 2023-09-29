@@ -42,6 +42,7 @@
 #define F_BUTN1LONG              2      // Button 1 pressed long (debounced)
 #define F_BUTN2                  4      // Button 2 pressed short (debounced)
 #define F_BUTN2LONG              8      // Button 2 pressed long (debounced)
+#define F_TIMELAG               16      // temporarily use button-register to flag "time lag" (DEBUGGING)
 
 #include "ESP8266TimerInterrupt.h"
 #include "ESP8266_ISR_Timer.hpp"

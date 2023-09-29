@@ -272,6 +272,7 @@ int16_t reSyncClockWork(int lag,u_long millis_now,u_long& millis_start) {
     int16_t _drift;
     
     log(WARN,__FUNCTION__,"Clockwork is %s",lag > 0 ? "late" : "early.");
+    log(DEBUG,__FUNCTION__,"millis_start: %llums millis_now: %llums lag: %is",millis_start,millis_now,lag);
 
     /* the return value of millis() provides sufficient storage for a time period of roughly 50 days (based on milliseconds).
        When the maximum value has been reached, millis() starts over and returns values starting at 0. To calculate the proper
@@ -335,7 +336,7 @@ void CompensateMinute() {
         comp_time = tt_hands;
         tt_hands -= 60;  // bugfix issue 10
         log(INFO,__FUNCTION__,"! Compensation minute set !");
-        setClockHands(hour(comp_time),minute(comp_time),hour(comp_time+60),minute(comp_time+60));  // set the clockwork + 1min
+        setClockHands(hour(tt_hands),minute(tt_hands),hour(tt_hands+60),minute(tt_hands+60));  // set the clockwork + 1min
         ISRcom |= F_CM_SET;                                                                     // flag compensate minute is set
     }
 }
