@@ -99,8 +99,11 @@ void IRAM_ATTR TimerHandler()
         
         if (ISRcom & F_FSTFWD_EN) {                       // if we run FASTFORWARD
             ticks--;                                      // decrease tick counter
-            if (ticks == 0)  ISRcom &= ~F_FSTFWD_EN;      // if requested number of ticks have been reached, disable FASTFORWARD
+            if (ticks == 0)  {                            // if requested number of ticks have been reached, 
+                ISRcom &= ~F_FSTFWD_EN;                   // disable FASTFORWARD,
+                ISRcom |= F_MINUTE_EN;                    // enable minute-trigger
             }
+        }
     }
 
  // check buttons (distinguish between long and short press)
@@ -253,7 +256,7 @@ boolean syncClockWork() {
           prevMinute = minute(tt_hands);
         }
     }
-    ISRcom |= F_MINUTE_EN;
+    //ISRcom |= F_MINUTE_EN; --> moved into TimerHandler (fast forward handling)
 
     return true;
 };
@@ -272,7 +275,7 @@ int16_t reSyncClockWork(int lag,u_long millis_now,u_long& millis_start) {
     int16_t _drift;
     
     log(WARN,__FUNCTION__,"Clockwork is %s",lag > 0 ? "late" : "early.");
-    log(DEBUG,__FUNCTION__,"millis_start: %llums millis_now: %llums lag: %is",millis_start,millis_now,lag);
+    log(DEBUG,__FUNCTION__,"millis_start: %lums millis_now: %lums lag: %is",millis_start,millis_now,lag);
 
     /* the return value of millis() provides sufficient storage for a time period of roughly 50 days (based on milliseconds).
        When the maximum value has been reached, millis() starts over and returns values starting at 0. To calculate the proper

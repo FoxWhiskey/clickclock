@@ -103,6 +103,7 @@ void setup()
   // ********** remember time stamps for time drift calculations
   systemstart_date   = now();                  // system start  NTP date
   systemstart_millis = millis();               // system start CPU clock date
+  log(DEBUG,__FUNCTION__,"systemstart_millis is %lums",systemstart_millis);
   // ********** synchronise clock work to system time and run clock
   syncClockWork();
   log(DEBUG,__FUNCTION__,"ISRcom: %i",int(ISRcom));
@@ -115,7 +116,7 @@ time_t prevHands = 0;
 time_t HandsNow = tt_hands;
 void loop()
 {
-  //logISR(); temporarily switched off
+  logISR(); //temporarily switched off
   delay(200);
   /*
   *  On normal operation, output status information every minute (on second 0)
@@ -169,7 +170,7 @@ void loop()
   }
     if ((ISRbtn & F_BUTN2) && !(ISRbtn & F_TIMELAG)) {
     ISRbtn |= F_TIMELAG;          // set F_TIMELAG
-    log(INFO,__FUNCTION__,"Faking true hand position from %02i:%02i:%02i to %02i:%02i:%02i",hour(tt_hands),minute(tt_hands),second(tt_hands),hour(tt_hands-2),minute(tt_hands-2),second(tt_hands-2));
-    tt_hands -= 2;             // introduce time lag by tweaking clock hand position
+    log(INFO,__FUNCTION__,"Faking true hand position from %02i:%02i:%02i to %02i:%02i:%02i",hour(tt_hands),minute(tt_hands),second(tt_hands),hour(tt_hands+3),minute(tt_hands+3),second(tt_hands+3));
+    tt_hands += 3;             // introduce time lag by tweaking clock hand position
     }
 }
