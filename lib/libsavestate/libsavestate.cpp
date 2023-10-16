@@ -26,7 +26,7 @@ systemdata::systemdata() :  _hour(HOUR_HAND_DEFAULT),
                             _pass(PASSWD),
                             _hostname("clickclock"),
                             _ntpserver(NTPSERVER),
-                            _drift(0)
+                            _drift(0.0)
 {
     
     EEPROM.begin(sizeof(*this));
@@ -120,9 +120,9 @@ void systemdata::get_flags() {
  * @brief interval time of Timer1 interrupt service routine. If '_drift' is positive (negative),
  * @brief the clock is late and the interrupt frequency must be set higher (lower). 
 */
-void systemdata::get(uint16_t& data) {
+void systemdata::get(float& data) {
     
-    data = uint16_t(1000 -_drift);
+    data = _drift;
 }
 
 /**

@@ -7,7 +7,7 @@
    */
 #define MAX_SSID_SIZE   24 
 #define MAX_PW_SIZE     24
-#define MAX_HOSTNAME_S  19
+#define MAX_HOSTNAME_S  18
 
 enum get_service {HOSTNAME,HOSTNAME_MAC,SSId,PASS,NTPSVR,HANDHOUR,HANDMINUTE,FLAG,DRIFT};
 
@@ -26,7 +26,7 @@ class systemdata
         int get(get_service get_type,char* &data);  
         uint8_t get_hand(get_service get_type);
         void get_flags();
-        void get(uint16_t& data);
+        void get(float& data);
         void get(loglevel& data);
         void get(time_t& data);
         void get(int8& data);
@@ -39,8 +39,8 @@ class systemdata
         char _ssid[MAX_SSID_SIZE];               // SSID (WiFi)                                    (24 bytes)
         time_t  _ntpinterval;                    // NTP resync interval of system clock (sec)      (8 bytes)
         char _pass[MAX_PW_SIZE];                 // password (WiFi)                                (24 bytes)
-        char _hostname[MAX_HOSTNAME_S];          // hostname of clickclock board                   (19 bytes)
-        char _ntpserver[MAX_HOSTNAME_S];         // hostname of NTPserver                          (19 bytes)
-        int16_t  _drift;                         // adaptive drift offset                          (2 bytes)
+        char _hostname[MAX_HOSTNAME_S];          // hostname of clickclock board                   (18 bytes)
+        char _ntpserver[MAX_HOSTNAME_S];         // hostname of NTPserver                          (18 bytes)
+        float  _drift;                           // adaptive drift offset                          (4 bytes)
 
 };
