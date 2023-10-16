@@ -26,18 +26,19 @@ char* pStr = NULL;                      // a generic pointer to a char or an arr
 char* pPass= NULL;                      // a second generic pointer to a char or an array of char
 char hostname[MAX_HOSTNAME_S]="";       // char array (cstring) to store hostname
 byte  mac[2] = {0,0};                   // array to store least two bytes of MAC-address
-int16_t drift;                          // adaptive drift;
+float drift;                            // adaptive drift;
 systemdata systemstate;       
 
 void setup()
 {
   // ******** restore system data from EEPROM ********
-  systemstate.get(setloglevel);                // restore loglevel
+  //systemstate.get(setloglevel);                // restore loglevel
+  setloglevel = DEBUG;
   systemstate.get(NTPsyncInterval);            // restore NTP-interval
   systemstate.get(timeZone);                   // restore time zone
   systemstate.get_flags();                     // restore F_POLARITY and F_CM_SET of ISRcom
   systemstate.get(NTPSVR,ntpServerName);       // restore NTPSERVER 
-    //systemstate.get(virt_ms);                    // restore virtual millisecond to compensate for osciallator drift
+  systemstate.get(drift);                    // restore virtual millisecond to compensate for osciallator drift
     // switched off for debugging purposes...
   // ******** Start serial console  ******************
   Serial.begin(115200);
@@ -99,7 +100,7 @@ void setup()
   transformDHP(systemstate.get_hand(HANDHOUR));    // modify "tt_hands" to represent current clockwork setting // bugfix issue #9
   hand.Hour = hour2clockface(hour(tt_hands));      // then update clockwork hour
   // ********** timer interrupt setup **********
-  setupInterrupts();
+  setupInterrupts(drift);
   // ********** remember time stamps for time drift calculations
   systemstart_date   = now();                  // system start  NTP date
   systemstart_millis = millis();               // system start CPU clock date
@@ -116,7 +117,7 @@ time_t prevHands = 0;
 time_t HandsNow = tt_hands;
 void loop()
 {
-  logISR(); //temporarily switched off
+  //logISR(); //temporarily switched off
   delay(200);
   /*
   *  On normal operation, output status information every minute (on second 0)
@@ -145,8 +146,9 @@ void loop()
                syncClockWork();                                             //    run a standard clockwork-sync
             } else {
                drift = reSyncClockWork(delta_t,millis(),systemstart_millis);    // else handle time drift (deviation less than a minute)
+               //drift = reSyncClockWork(delta_t,millis()+(u_long)97862388,systemstart_millis);  // for DEBUGGING purposes
                systemstate.collect();                                       // collect new drift value
-               systemstate.write();                                         // and store it in EEPROM
+               if (drift != -1234.5) systemstate.write();                   // and store it in EEPROM
             } 
           }
        }
@@ -170,7 +172,10 @@ void loop()
   }
     if ((ISRbtn & F_BUTN2) && !(ISRbtn & F_TIMELAG)) {
     ISRbtn |= F_TIMELAG;          // set F_TIMELAG
-    log(INFO,__FUNCTION__,"Faking true hand position from %02i:%02i:%02i to %02i:%02i:%02i",hour(tt_hands),minute(tt_hands),second(tt_hands),hour(tt_hands+3),minute(tt_hands+3),second(tt_hands+3));
-    tt_hands += 3;             // introduce time lag by tweaking clock hand position
+    //log(INFO,__FUNCTION__,"Faking true hand position from %02i:%02i:%02i to %02i:%02i:%02i",hour(tt_hands),minute(tt_hands),second(tt_hands),hour(tt_hands+3),minute(tt_hands+3),second(tt_hands+3));
+    //tt_hands += 3;             // introduce time lag by tweaking clock hand position
+    setTime(now()-3603);
+    log(INFO,__FUNCTION__,"System time faked!");
+    digitalClockDisplay();
     }
 }
