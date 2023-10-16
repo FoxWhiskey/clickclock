@@ -53,10 +53,10 @@ extern volatile byte ISRbtn;
 extern volatile uint ticks;
 extern volatile time_t tt_hands;
 
-boolean setupInterrupts();           // start interrupt processing
+boolean setupInterrupts(float &drift);           // start interrupt processing
 void setClockHands(int from_hand_h, int from_hand_min, int to_hand_h, int to_hand_min);                                         
 boolean syncClockWork();
-int16_t reSyncClockWork(int lag,u_long millis_now,u_long& millis_start);
+float reSyncClockWork(int lag,u_long millis_now,u_long& millis_start);
 int minute_steps(int from_h, int from_min, int to_h, int to_min); // calculate the number steps needed between two times
 void CompensateMinute();
 void transformDHP(int defaultHour);

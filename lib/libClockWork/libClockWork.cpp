@@ -2,6 +2,7 @@
 #include<log.h>
 #include<TimeLib.h>
 #include<libClockWork.h>
+#include<cmath>
 
 ESP8266Timer ITimer;
 ESP8266_ISR_Timer ISR_Timer;
@@ -183,12 +184,16 @@ return true;
 
 /**
  * @brief set up Interrupt handling for clockwork operations
+ * @param int CPU drift to be considered when defining interrupt intervals
+ * @return status of interrupt handler, true if interrupt handling setup successfully 
 */
-boolean setupInterrupts() {
-    boolean timerStart = ITimer.attachInterruptInterval(HW_TIMER_INTERVAL*virt_ms,TimerHandler);
+boolean setupInterrupts(float &drift) {
+
+    long offset = lround((float)HW_TIMER_INTERVAL*drift);
+    boolean timerStart = ITimer.attachInterruptInterval(HW_TIMER_INTERVAL*1000L+offset,TimerHandler);
 
     if (timerStart) {
-        log(DEBUG,__FUNCTION__,"Starting ITimer, virtual ms is %iµs",virt_ms);
+        log(DEBUG,__FUNCTION__,"Starting ITimer, timer offset rounded to %li µs @%li ms timer interval.",offset,HW_TIMER_INTERVAL);
         sync_ISR_MinuteTrigger();
         ISR_Timer.setInterval(TIMER_INTERVAL_FASTF,ISR_FastForward);
         log(DEBUG,__FUNCTION__,"ISR_FastForward timer started...");
@@ -268,11 +273,12 @@ boolean syncClockWork() {
  * @param int negative value to indicate clockwork is early, positive value to indicate clockwork is late (NTP-time - clockwork-time)
  * @param ulong millis-value on calling this function
  * @param ulong& millis value when interrupts have been resynced last time
- * @return always true
+ * @return estimated drift value (since last call) 
 */
-int16_t reSyncClockWork(int lag,u_long millis_now,u_long& millis_start) {
+float reSyncClockWork(int lag,u_long millis_now,u_long& millis_start) {
     
-    int16_t _drift;
+    float _drift;
+    u_long delta_millis;
     
     log(WARN,__FUNCTION__,"Clockwork is %s",lag > 0 ? "late" : "early.");
     log(DEBUG,__FUNCTION__,"millis_start: %lums millis_now: %lums lag: %is",millis_start,millis_now,lag);
@@ -281,22 +287,25 @@ int16_t reSyncClockWork(int lag,u_long millis_now,u_long& millis_start) {
        When the maximum value has been reached, millis() starts over and returns values starting at 0. To calculate the proper
        time span between two resync-intervals, a potential overrun has to be considered and taken care of.
        The size of 'ulong' also determines the smallest drift correction value of MAX_NTP_DEVIATION/50 days.
-       An oscillator time drift smaller than this value cannot be compensated for without more complex code.
+       Thus, an oscillator time drift smaller than this value cannot be compensated for without more complex code.
+
+       _drift is the difference in microseconds of actual HW_TIMER_INTERVAL*1000 and the estimated "true" interrupt interval, estimated on
+       time stamp difference "delta_millis"
     */
     if ((millis_now - millis_start) > 0) {                              // no overrun !
-        _drift = 1000000L*lag/((millis_now-millis_start)/60000L);
+        delta_millis = millis_now - millis_start;
     } else {                                                            // overrun has occured
-        _drift = 1000000L*lag/((0xFFFFFFFF-millis_start+millis_now)/60000L);
+        delta_millis =  0xFFFFFFFF-millis_start+millis_now;
     }
-    virt_ms = (virt_ms+(1000-_drift))/2;   // approximation by arithmetic mean
-    log(INFO,__FUNCTION__,"Calculated drift is %iµs, new virtual ms will be set to %iµs",_drift,virt_ms);
+    _drift = float((double(((delta_millis+lag*1000)/double(delta_millis))*HW_TIMER_INTERVAL*1000) - 1000.0*HW_TIMER_INTERVAL)/double(HW_TIMER_INTERVAL));
+    log(INFO,__FUNCTION__,"Calculated drift is %6.4fµs per CPU-millisecond",_drift);
     ISR_Timer.deleteTimer(sec_id);
     ISR_Timer.deleteTimer(minute_id);
-    ISRcom &= ~F_INTRUN;                   // flag no interrupt service routines are running
-    ITimer.detachInterrupt();              // stop entire interrupt handling
-    //sync_ISR_MinuteTrigger();            // re-sync the ISR routines to NTP time
-    setupInterrupts();                     // restart interrupt handling
-    millis_start = millis();               // reset millis since last resync
+    ISRcom &= ~F_INTRUN;                              // flag no interrupt service routines are running
+    ITimer.detachInterrupt();                         // stop entire interrupt handling
+    //sync_ISR_MinuteTrigger();                       // re-sync the ISR routines to NTP time
+    if (!setupInterrupts(_drift)) _drift = -1234.5;   // restart interrupt handling, return arbitrary value if failed
+    millis_start = millis();                          // reset millis since last resync
 
     // if clockwork is late, drive clockwork by a single minute
     if (lag > 0) setClockHands(hour(tt_hands),minute(tt_hands),hour(tt_hands+SECS_PER_MIN),minute(tt_hands+SECS_PER_MIN));
@@ -333,10 +342,8 @@ int minute_steps(int from_h, int from_min, int to_h, int to_min) {
 */
 void CompensateMinute() {
     
-    time_t comp_time;
     if (!(ISRcom & F_CM_SET)) 
     {
-        comp_time = tt_hands;
         tt_hands -= 60;  // bugfix issue 10
         log(INFO,__FUNCTION__,"! Compensation minute set !");
         setClockHands(hour(tt_hands),minute(tt_hands),hour(tt_hands+60),minute(tt_hands+60));  // set the clockwork + 1min
