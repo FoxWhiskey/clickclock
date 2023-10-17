@@ -9,7 +9,7 @@
 extern byte mac[2];
 extern loglevel setloglevel;
 extern int8 timeZone;
-extern int16_t drift;
+extern float drift;
 
 /**
  * @brief standard constructor, will load default values into systemdata object, 
