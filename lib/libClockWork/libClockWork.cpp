@@ -190,7 +190,7 @@ return true;
 boolean setupInterrupts(float &drift) {
 
     long offset = lround((float)HW_TIMER_INTERVAL*drift);
-    boolean timerStart = ITimer.attachInterruptInterval(HW_TIMER_INTERVAL*1000L+offset,TimerHandler);
+    boolean timerStart = ITimer.attachInterruptInterval(HW_TIMER_INTERVAL*1000L-offset,TimerHandler);
 
     if (timerStart) {
         log(DEBUG,__FUNCTION__,"Starting ITimer, timer offset rounded to %li µs @%li ms timer interval.",offset,HW_TIMER_INTERVAL);
