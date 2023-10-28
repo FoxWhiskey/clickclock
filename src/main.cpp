@@ -45,6 +45,7 @@ void setup()
   welcome();
   log(DEBUG,__FUNCTION__,"Size of systemdata-class: %i",sizeof(systemdata));
   systemstate.status();
+  log(INFO,__FUNCTION__,"---> SYSTEM TIMEZONE is %hhi <---",timeZone);
   // ******** set outputs *********************
   pinMode(PIN_D1,OUTPUT);
   pinMode(PIN_D2,OUTPUT);
