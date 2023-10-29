@@ -142,7 +142,7 @@ void loop()
             log(WARN,__FUNCTION__,"delta_NTP is %llds Clockwork out of sync! Resyncing...",time_NTP-tt_hands);
             ISRcom &= ~F_MINUTE_EN;                                         // stop clockwork
             ISRcom &= ~F_SEC00;                                             // stop full minute indication
-            if (abs(delta_t > 59)) {                                        // if deviation is 60sec and more (e.g. DST change, loss of NTP)
+            if (abs(delta_t) > 59) {                                        // if deviation is 60sec and more (e.g. DST change, loss of NTP)
                breakTime(tt_hands,hand);                                    // update "hand" and
                syncClockWork();                                             //    run a standard clockwork-sync
             } else {
