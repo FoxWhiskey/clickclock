@@ -164,13 +164,13 @@ void IRAM_ATTR TimerHandler()
 */
 boolean sync_ISR_MinuteTrigger() {
 
-   time_t epoch = now();
+   time_t epoch = nowdst();
 
     if (timeStatus() == timeNeedsSync) log(WARN,__FUNCTION__,"System time needs NTP-resync...");
-    log(INFO,__FUNCTION__,"Current second is %02i. Syncing...",second(epoch));
+    log(INFO,__FUNCTION__,"Current second is %02i. Epoch is %lld. Syncing...",second(epoch),epoch);
     while (second(epoch) != 0) { 
         delay(200);
-        epoch = now();
+        epoch = nowdst();
     };
     sec00 = 0;
     minute_id = ISR_Timer.setInterval(TIMER_INTERVAL_60S,ISR_MinuteTrigger);
@@ -246,7 +246,8 @@ boolean syncClockWork() {
     log(INFO,__FUNCTION__,"Waiting for setting window...");
     while (!(ISRcom & F_SEC00)) delay(100);          // on F_SEC00,
     if (timeStatus() == timeNeedsSync) log(WARN,__FUNCTION__,"System time needs NTP-resync...");
-    systime = now();
+    systime = nowdst();
+    log(DEBUG,__FUNCTION__,"systime is %lld",systime);
     clicks = minute_steps(hand.Hour,hand.Minute,hour(systime),minute(systime));
     if (clicks*int(TIMER_INTERVAL_FASTF)/1000 > 55) {
         offset = clicks*int(TIMER_INTERVAL_FASTF)/1000;  // bugfix issue #7

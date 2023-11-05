@@ -7,6 +7,7 @@
 #include <ESP8266_ISR_Timer.h>
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
+#include <FakeProvider.h>
 #include "ntp.h"
 
 loglevel setloglevel;                   // stores the loglevel of serial console. Loglevel can be set in 'wificonfig.h'
@@ -86,15 +87,16 @@ void setup()
   log(INFO,__FUNCTION__,"Setting DST zone");
   setDSTProvider(CET);
   log(INFO, __FUNCTION__, "Waiting for sync...");
-  setSyncProvider(getNtpTime);
+  //setSyncProvider(getNtpTime);
+  setSyncProvider(getFakeTime);
   setSyncInterval(NTPsyncInterval);
   log(INFO,__FUNCTION__,"NTP-interval is %i sec",(uint32_t)NTPsyncInterval);
   while (timeStatus() == timeNotSet) {
     delay(100);
   } 
 
-  digitalClockDisplay();
-  breakTime(now(),hand);                           // load current date into "hand"
+  digitalClockDisplay(nowdst);
+  breakTime(nowdst(),hand);                           // load current date into "hand"
   hand.Minute = systemstate.get_hand(HANDMINUTE);  // set clockwork minute
   hand.Second = 0;                                 // set clockwork second  // bugfix issue #13
   tt_hands = makeTime(hand);                       // derive time_t object from "hand"  // bugfix issue #9
@@ -103,7 +105,7 @@ void setup()
   // ********** timer interrupt setup **********
   setupInterrupts(drift);
   // ********** remember time stamps for time drift calculations
-  systemstart_date   = now();                  // system start  NTP date
+  systemstart_date   = now();                  // system start  NTP date (UTC)
   systemstart_millis = millis();               // system start CPU clock date
   log(DEBUG,__FUNCTION__,"systemstart_millis is %lums",systemstart_millis);
   // ********** synchronise clock work to system time and run clock
@@ -126,13 +128,14 @@ void loop()
   if (ISRcom & F_SEC00) {
      if (timeStatus() != timeNotSet)
      {
-       time_NTP = now();
+       time_NTP = nowdst();
        if (HandsNow != prevHands)
        { // update the display only if clockwork position has changed
          prevHands = HandsNow;
          delta_t = time_NTP-tt_hands; 
          log(INFO,__FUNCTION__,"[%02i:%02i:%02i]: Hands at %02i:%02i",hour(time_NTP),minute(time_NTP),second(time_NTP),hour2clockface(hour(tt_hands)),minute(tt_hands));
          log(DEBUG,__FUNCTION__,"delta_NTP is %llds [%lld/%lld]",delta_t,time_NTP,tt_hands);
+         digitalClockDisplay(nowdst);
          
          /*
           * Test on time gap between systemtime/NTP and clockwork time - resync clockwork if needed
@@ -141,12 +144,13 @@ void loop()
           {
             log(WARN,__FUNCTION__,"delta_NTP is %llds Clockwork out of sync! Resyncing...",time_NTP-tt_hands);
             ISRcom &= ~F_MINUTE_EN;                                         // stop clockwork
-            ISRcom &= ~F_SEC00;                                             // stop full minute indication
             if (abs(delta_t) > 59) {                                        // if deviation is 60sec and more (e.g. DST change, loss of NTP)
                breakTime(tt_hands,hand);                                    // update "hand" and
                syncClockWork();                                             //    run a standard clockwork-sync
+               if (delta_t < 0) tt_hands -= SECS_PER_DAY/2;                 //    and correct tt_hands to hold the correct time value of clockhand position
             } else {
-               drift = reSyncClockWork(delta_t,millis(),systemstart_millis);    // else handle time drift (deviation less than a minute)
+               ISRcom &= ~F_SEC00;                                              // else stop full minute indication
+               drift = reSyncClockWork(delta_t,millis(),systemstart_millis);    // and handle time drift (deviation less than a minute)
                //drift = reSyncClockWork(delta_t,millis()+(u_long)97862388,systemstart_millis);  // for DEBUGGING purposes
                systemstate.collect();                                       // collect new drift value
                if (drift != -1234.5) systemstate.write();                   // and store it in EEPROM
@@ -175,8 +179,8 @@ void loop()
     ISRbtn |= F_TIMELAG;          // set F_TIMELAG
     //log(INFO,__FUNCTION__,"Faking true hand position from %02i:%02i:%02i to %02i:%02i:%02i",hour(tt_hands),minute(tt_hands),second(tt_hands),hour(tt_hands+3),minute(tt_hands+3),second(tt_hands+3));
     //tt_hands += 3;             // introduce time lag by tweaking clock hand position
-    setTime(now()-3603);
+    setTime(nowdst()-3603);
     log(INFO,__FUNCTION__,"System time faked!");
-    digitalClockDisplay();
+    digitalClockDisplay(nowdst);
     }
 }

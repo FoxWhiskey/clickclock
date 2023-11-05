@@ -34,6 +34,7 @@
 #endif
 
 #include "TimeLib.h"
+#include <log.h>
 
 static tmElements_t tm;          // a cache of time elements
 static time_t cacheTime;   // the time the cache was updated
@@ -210,6 +211,7 @@ void breakTime(time_t timeInput, tmElements_t &tm){
   tm.Month = month + 1;  // jan is month 1  
   tm.Day = time + 1;     // day of month
   tm.dst = DST(tm);      // true, if DST applies
+  log(DEBUG,__FUNCTION__,"DST returns %s. timeInput is %lld.",(tm.dst == true) ? "true":"false",timeInput);
 }
 
 time_t makeTime(const tmElements_t &tm){   
@@ -272,6 +274,7 @@ time_t now() {
     if (getTimePtr != 0) {
       time_t t = getTimePtr();
       if (t != 0) {
+//        Serial.print("Calling refreshCache(t) with ");Serial.println(tm.dst == true ? t + SECS_PER_HOUR : t);
         refreshCache(t);
         setTime(t);
       } else {
@@ -280,7 +283,17 @@ time_t now() {
       }
     }
   }  
-  return (time_t)sysTime;
+//  log(DEBUG,__FUNCTION__,"DST is %s.",(tm.dst == true) ? "true" : "false");
+return (time_t)sysTime;
+}
+
+/**
+ * @brief returns current date in seconds past 1970/01/01.
+ * @brief if DST applies, an offset of SECS_PER_HOUR is added.
+*/
+time_t nowdst() {
+  log(DEBUG,__FUNCTION__,"DST is %s ",dst() == true ? "true":"false");
+  return (dst() == true) ? now() + SECS_PER_HOUR : now();
 }
 
 void setTime(time_t t) { 
@@ -289,8 +302,9 @@ void setTime(time_t t) {
    sysUnsyncedTime = t;   // store the time of the first call to set a valid Time   
 #endif
   uint32_t dst_offset = tm.dst == true ? (uint32_t)SECS_PER_HOUR : 0;
-  sysTime = (uint32_t)t + dst_offset;  
-  nextSyncTime = (uint32_t)t + + dst_offset + syncInterval;
+  Serial.println(dst_offset);
+  sysTime = (uint32_t)t;  
+  nextSyncTime = (uint32_t)t + syncInterval;
   Status = timeSet;
   prevMillis = millis();  // restart counting from now (thanks to Korman for this fix)
 } 
