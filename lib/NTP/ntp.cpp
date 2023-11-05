@@ -14,22 +14,27 @@ int8 timeZone = 0;                                // UTC! Local timezone will be
 WiFiUDP Udp;
 unsigned int localPort = 8888;                    // local port to listen for UDP packets
 
-void digitalClockDisplay()
+/**
+ * @brief prints date and time to serial console
+ * @param function function pointer that returns a `time_t` element to be printed to console
+*/
+void digitalClockDisplay(time_t (*PtimeSrc)())
 {
+  time_t nowtime = PtimeSrc();
   // digital clock display of the time
   #ifndef FOXLOGGER
-  Serial.print(hour());
-  printDigits(minute());
-  printDigits(second());
+  Serial.print(hour(nowtime));
+  printDigits(minute(nowtime));
+  printDigits(second(nowtime));
   Serial.print(" ");
-  Serial.print(day());
+  Serial.print(day(nowtime));
   Serial.print(".");
-  Serial.print(month());
+  Serial.print(month(nowtime));
   Serial.print(".");
-  Serial.print(year());
+  Serial.print(year(nowtime));
   Serial.println();
   #else
-  log(INFO,__FUNCTION__,"[%02i.%02i.%i] %02i:%02i:%02i %s",day(),month(),year(),hour(),minute(),second(), dst() == true ? "DST" : "");
+  log(INFO,__FUNCTION__,"[%02i.%02i.%i] %02i:%02i:%02i %s",day(nowtime),month(nowtime),year(nowtime),hour(nowtime),minute(nowtime),second(nowtime), dst() == true ? "DST" : "");
   #endif
 }
 #ifndef FOXLOGGER
