@@ -8,6 +8,7 @@ ESP8266Timer ITimer;
 ESP8266_ISR_Timer ISR_Timer;
 int minute_id = 0;                      // the id of ISR_Minute_Trigger
 int sec_id = 0;                         // the id of ISR_Second_Trigger
+int ff_id = 0;                          // the id of ISR_FastForward_Trigger
 uint16 virt_ms = 1000;                  // value representing a true millisecond based on multiple microseconds (virtual millisecond)
 
 extern TimeElements hand;
@@ -22,6 +23,8 @@ volatile uint ticks = 0;
 volatile byte sec00 = 0;
 volatile byte LEDshift = 0;           // shift register variable to control LED
 volatile time_t tt_hands = 0;
+volatile time_t mil_pre = 0;
+volatile time_t mil_dif = 0;
 
 /**
  *  --- ISR service routines ---
@@ -31,7 +34,8 @@ volatile time_t tt_hands = 0;
  * @brief ISR for clock hands fast forward
 */
 void IRAM_ATTR ISR_FastForward() {
-    
+    mil_dif = millis() - mil_pre;
+    mil_pre = millis();
     if (ISRcom & F_FSTFWD_EN) {                            // if fast forward enabled
       if (ISRcom & F_POLARITY) {
          digitalWrite(PIN_D1,LOW);                         // Power on, positive polarity
@@ -177,6 +181,7 @@ boolean sync_ISR_MinuteTrigger() {
     sec_id =    ISR_Timer.setInterval(TIMER_INTERVAL_1000MS,ISR_SecondTrigger);
     ISRcom |= (F_INTRUN + F_SEC00);   // at this point in time we have synchronised both ISRs to full minute (second=0) of the hour. Flag ISR running and second==0
     log(INFO,__FUNCTION__,"ISRs synchronised with system time: %02i:%02i:%02i",hour(epoch),minute(epoch),second(epoch));
+    logISR();
     
 return true;
 }
@@ -195,7 +200,7 @@ boolean setupInterrupts(float &drift) {
     if (timerStart) {
         log(DEBUG,__FUNCTION__,"Starting ITimer, timer offset rounded to %li µs @%li ms timer interval.",offset,HW_TIMER_INTERVAL);
         sync_ISR_MinuteTrigger();
-        ISR_Timer.setInterval(TIMER_INTERVAL_FASTF,ISR_FastForward);
+        ff_id = ISR_Timer.setInterval(TIMER_INTERVAL_FASTF,ISR_FastForward);
         log(DEBUG,__FUNCTION__,"ISR_FastForward timer started...");
 
     } else {
@@ -223,7 +228,7 @@ return timerStart;
 void setClockHands(int from_hand_h, int from_hand_min, int to_hand_h, int to_hand_min) {
 
    ticks = minute_steps(from_hand_h,from_hand_min,to_hand_h,to_hand_min);
-   log(INFO,__FUNCTION__,"Setting clock hands from %02i:%02i to %02i:%02i (%i ticks)",from_hand_h,from_hand_min,to_hand_h,to_hand_min,ticks);
+   log(INFO,__FUNCTION__,"Setting clock hands from %02i:%02i to %02i:%02i (%i ticks)",hour2clockface(from_hand_h),from_hand_min,to_hand_h,to_hand_min,ticks);
    if (ticks > 0) {
       ISRcom &= ~F_MINUTE_EN;
       ISRcom |= F_FSTFWD_EN;
@@ -247,23 +252,22 @@ boolean syncClockWork() {
     while (!(ISRcom & F_SEC00)) delay(100);          // on F_SEC00,
     if (timeStatus() == timeNeedsSync) log(WARN,__FUNCTION__,"System time needs NTP-resync...");
     systime = nowdst();
-    log(DEBUG,__FUNCTION__,"systime is %lld",systime);
     clicks = minute_steps(hand.Hour,hand.Minute,hour(systime),minute(systime));
     if (clicks*int(TIMER_INTERVAL_FASTF)/1000 > 55) {
         offset = clicks*int(TIMER_INTERVAL_FASTF)/1000;  // bugfix issue #7
-        log(DEBUG,__FUNCTION__,"Hands @ %02i:%02i. Estimated hand setting time is %is. Offset required!",hand.Hour,hand.Minute,offset);
+        log(DEBUG,__FUNCTION__,"Hands @ %02i:%02i. Estimated hand setting time is %is. Offset required!",hour2clockface(hand.Hour),hand.Minute,offset);
     }
     setClockHands(hand.Hour,hand.Minute,hour(systime+time_t(offset)),minute(systime+time_t(offset)));  // bugfix issue #7
     while (ISRcom & F_FSTFWD_EN) {
         delay(100);
         if (minute(tt_hands) != prevMinute)
         {
-          log(DEBUG,__FUNCTION__,"hand position: %02i:%02i",hour2clockface(hour(tt_hands)),minute(tt_hands));
+          log(DEBUG,__FUNCTION__,"hand position: %02i:%02i / %lld",hour2clockface(hour(tt_hands)),minute(tt_hands),tt_hands);
+          //log(DEBUG,__FUNCTION__,"tt_hands: %02d-%02d-%02d %02d:%02d:%02d",day(tt_hands),month(tt_hands),year(tt_hands),hour(tt_hands),minute(tt_hands),second(tt_hands));
           prevMinute = minute(tt_hands);
         }
     }
-    //ISRcom |= F_MINUTE_EN; --> moved into TimerHandler (fast forward handling)
-
+    ISRcom |= F_MINUTE_EN;
     return true;
 };
 
@@ -302,9 +306,11 @@ float reSyncClockWork(int lag,u_long millis_now,u_long& millis_start) {
     log(INFO,__FUNCTION__,"Calculated drift is %6.4fµs per CPU-millisecond",_drift);
     ISR_Timer.deleteTimer(sec_id);
     ISR_Timer.deleteTimer(minute_id);
+    ISR_Timer.deleteTimer(ff_id);
     ISRcom &= ~F_INTRUN;                              // flag no interrupt service routines are running
     ITimer.detachInterrupt();                         // stop entire interrupt handling
     //sync_ISR_MinuteTrigger();                       // re-sync the ISR routines to NTP time
+    _drift = 0.0f;  // DEBUGGING ONLY !!!!
     if (!setupInterrupts(_drift)) _drift = -1234.5;   // restart interrupt handling, return arbitrary value if failed
     millis_start = millis();                          // reset millis since last resync
 
@@ -312,7 +318,7 @@ float reSyncClockWork(int lag,u_long millis_now,u_long& millis_start) {
     if (lag > 0) setClockHands(hour(tt_hands),minute(tt_hands),hour(tt_hands+SECS_PER_MIN),minute(tt_hands+SECS_PER_MIN));
     // else do nothing (ISR sync is sufficient)
     ISRcom |= F_MINUTE_EN;   // enable clockwork
-    
+    log(DEBUG,__FUNCTION__,"done...");
     return _drift;   
 };
 

@@ -12,12 +12,13 @@
 
 loglevel setloglevel;                   // stores the loglevel of serial console. Loglevel can be set in 'wificonfig.h'
 time_t NTPsyncInterval;                 // stores the NTP-resync interval. Default value can be set in 'wificonfig.h'
+int8 timeZone;                          // stores the local time zone. Default value can be set in 'wificonfig.h'
 
-extern int8 timeZone;
 extern char* ntpServerName;
 extern WiFiUDP Udp;
 extern unsigned int localPort;
 extern uint16 virt_ms;
+extern time_t mil_dif;
 TimeElements hand;
 unsigned long systemstart_millis = 0;
 time_t systemstart_date = 0;
@@ -46,7 +47,6 @@ void setup()
   welcome();
   log(DEBUG,__FUNCTION__,"Size of systemdata-class: %i",sizeof(systemdata));
   systemstate.status();
-  log(INFO,__FUNCTION__,"---> SYSTEM TIMEZONE is %hhi <---",timeZone);
   // ******** set outputs *********************
   pinMode(PIN_D1,OUTPUT);
   pinMode(PIN_D2,OUTPUT);
@@ -84,6 +84,8 @@ void setup()
   // ********** NTP & time setup **************
   Udp.begin(localPort);
   log(INFO, __FUNCTION__, "Local port: %i", Udp.localPort());
+  setTimeZone(timeZone);
+  log(INFO,__FUNCTION__,"Setting system time zone: %hhi",timeZone);
   log(INFO,__FUNCTION__,"Setting DST zone");
   setDSTProvider(CET);
   log(INFO, __FUNCTION__, "Waiting for sync...");
@@ -121,6 +123,7 @@ time_t HandsNow = tt_hands;
 void loop()
 {
   //logISR(); //temporarily switched off
+  //log(DEBUG,__FUNCTION__,"ISR_FastForward has %lld",mil_dif);
   delay(200);
   /*
   *  On normal operation, output status information every minute (on second 0)
@@ -133,9 +136,8 @@ void loop()
        { // update the display only if clockwork position has changed
          prevHands = HandsNow;
          delta_t = time_NTP-tt_hands; 
-         log(INFO,__FUNCTION__,"[%02i:%02i:%02i]: Hands at %02i:%02i",hour(time_NTP),minute(time_NTP),second(time_NTP),hour2clockface(hour(tt_hands)),minute(tt_hands));
+         log(INFO,__FUNCTION__,"[%02i.%02i.%02i %02i:%02i:%02i %s]: Hands at %02i:%02i",day(time_NTP),month(time_NTP),year(time_NTP),hour(time_NTP),minute(time_NTP),second(time_NTP),dst(now()) == true ? "DST" :"",hour2clockface(hour(tt_hands)),minute(tt_hands));
          log(DEBUG,__FUNCTION__,"delta_NTP is %llds [%lld/%lld]",delta_t,time_NTP,tt_hands);
-         digitalClockDisplay(nowdst);
          
          /*
           * Test on time gap between systemtime/NTP and clockwork time - resync clockwork if needed
@@ -145,15 +147,18 @@ void loop()
             log(WARN,__FUNCTION__,"delta_NTP is %llds Clockwork out of sync! Resyncing...",time_NTP-tt_hands);
             ISRcom &= ~F_MINUTE_EN;                                         // stop clockwork
             if (abs(delta_t) > 59) {                                        // if deviation is 60sec and more (e.g. DST change, loss of NTP)
-               breakTime(tt_hands,hand);                                    // update "hand" and
-               syncClockWork();                                             //    run a standard clockwork-sync
-               if (delta_t < 0) tt_hands -= SECS_PER_DAY/2;                 //    and correct tt_hands to hold the correct time value of clockhand position
+               if (delta_t < 0) tt_hands -= SECS_PER_DAY/2;                 // "pre"-correct tt_hands in case delta_t is negative: clockwork can only turn forward!!! Super bug!!
+               breakTime(tt_hands,hand);                                    // and update "hand"
+               log(DEBUG,__FUNCTION__,"tt_hands: %0d-%0d-%0d %0d:%0d:%0d",hand.Day,hand.Month,hand.Year+1970,hand.Hour,hand.Minute,hand.Second);
+            //   if ((abs(delta_t) % 60) > 0) ISRcom &= ~F_SEC00;             // leave F_SEC00 set ONLY if no drift is present, then 
+               syncClockWork();                                             // run a standard clockwork-sync
+               log(DEBUG,__FUNCTION__,"tt_hands corrected to %lld",tt_hands);
             } else {
                ISRcom &= ~F_SEC00;                                              // else stop full minute indication
                drift = reSyncClockWork(delta_t,millis(),systemstart_millis);    // and handle time drift (deviation less than a minute)
                //drift = reSyncClockWork(delta_t,millis()+(u_long)97862388,systemstart_millis);  // for DEBUGGING purposes
                systemstate.collect();                                       // collect new drift value
-               if (drift != -1234.5) systemstate.write();                   // and store it in EEPROM
+//               if (drift != -1234.5) systemstate.write();                   // and store it in EEPROM
             } 
           }
        }

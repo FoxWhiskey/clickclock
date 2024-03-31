@@ -9,8 +9,7 @@
 #endif
 #include "ntp.h"
 
-char* ntpServerName = NULL;                       // will be set by systemdata class
-int8 timeZone = 0;                                // UTC! Local timezone will be set by systemdata class 
+char* ntpServerName = NULL;                       // will be set by systemdata class 
 WiFiUDP Udp;
 unsigned int localPort = 8888;                    // local port to listen for UDP packets
 
@@ -90,7 +89,7 @@ time_t getNtpTime()
       secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
       secsSince1900 |= (unsigned long)packetBuffer[43];
       log(INFO,__FUNCTION__,"System clock updated.");
-      return secsSince1900 - 2208988800UL + timeZone * SECS_PER_HOUR;
+      return secsSince1900 - 2208988800UL;
     }
   }
   #ifndef FOXLOGGER
