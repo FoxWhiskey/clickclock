@@ -14,6 +14,7 @@ loglevel setloglevel;                   // stores the loglevel of serial console
 time_t NTPsyncInterval;                 // stores the NTP-resync interval. Default value can be set in 'wificonfig.h'
 int8 timeZone;                          // stores the local time zone. Default value can be set in 'wificonfig.h'
 
+extern ESP8266_ISR_Timer ISR_Timer;
 extern char* ntpServerName;
 extern WiFiUDP Udp;
 extern unsigned int localPort;
@@ -34,14 +35,12 @@ systemdata systemstate;
 void setup()
 {
   // ******** restore system data from EEPROM ********
-  //systemstate.get(setloglevel);                // restore loglevel
-  setloglevel = DEBUG;
+  systemstate.get(setloglevel);                // restore loglevel
   systemstate.get(NTPsyncInterval);            // restore NTP-interval
   systemstate.get(timeZone);                   // restore time zone
   systemstate.get_flags();                     // restore F_POLARITY and F_CM_SET of ISRcom
   systemstate.get(NTPSVR,ntpServerName);       // restore NTPSERVER 
-  systemstate.get(drift);                    // restore virtual millisecond to compensate for osciallator drift
-    // switched off for debugging purposes...
+  systemstate.get(drift);                      // restore virtual millisecond to compensate for oscillator drift
   // ******** Start serial console  ******************
   Serial.begin(115200);
   welcome();
@@ -89,8 +88,7 @@ void setup()
   log(INFO,__FUNCTION__,"Setting DST zone");
   setDSTProvider(CET);
   log(INFO, __FUNCTION__, "Waiting for sync...");
-  //setSyncProvider(getNtpTime);
-  setSyncProvider(getFakeTime);
+  setSyncProvider(getNtpTime);
   setSyncInterval(NTPsyncInterval);
   log(INFO,__FUNCTION__,"NTP-interval is %i sec",(uint32_t)NTPsyncInterval);
   while (timeStatus() == timeNotSet) {
@@ -123,7 +121,6 @@ time_t HandsNow = tt_hands;
 void loop()
 {
   //logISR(); //temporarily switched off
-  //log(DEBUG,__FUNCTION__,"ISR_FastForward has %lld",mil_dif);
   delay(200);
   /*
   *  On normal operation, output status information every minute (on second 0)
@@ -156,9 +153,8 @@ void loop()
             } else {
                ISRcom &= ~F_SEC00;                                              // else stop full minute indication
                drift = reSyncClockWork(delta_t,millis(),systemstart_millis);    // and handle time drift (deviation less than a minute)
-               //drift = reSyncClockWork(delta_t,millis()+(u_long)97862388,systemstart_millis);  // for DEBUGGING purposes
                systemstate.collect();                                       // collect new drift value
-//               if (drift != -1234.5) systemstate.write();                   // and store it in EEPROM
+               if (drift != -1234.5) systemstate.write();                   // and store it in EEPROM
             } 
           }
        }
@@ -175,17 +171,13 @@ void loop()
    
     systemstate.collect();
     systemstate.write();
+    ISR_Timer.disableAll();
+    ISRcom &= ~F_SEC00;
     ISRcom &= ~F_MINUTE_EN;
+
     ISRcom |= F_SAFE;
+    
     systemstate.status();
     log(WARN,__FUNCTION__,"System state saved! CLOCKWORK HALTED! You may now power off!");
   }
-    if ((ISRbtn & F_BUTN2) && !(ISRbtn & F_TIMELAG)) {
-    ISRbtn |= F_TIMELAG;          // set F_TIMELAG
-    //log(INFO,__FUNCTION__,"Faking true hand position from %02i:%02i:%02i to %02i:%02i:%02i",hour(tt_hands),minute(tt_hands),second(tt_hands),hour(tt_hands+3),minute(tt_hands+3),second(tt_hands+3));
-    //tt_hands += 3;             // introduce time lag by tweaking clock hand position
-    setTime(nowdst()-3603);
-    log(INFO,__FUNCTION__,"System time faked!");
-    digitalClockDisplay(nowdst);
-    }
 }

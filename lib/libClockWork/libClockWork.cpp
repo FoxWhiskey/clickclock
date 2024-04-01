@@ -198,7 +198,7 @@ boolean setupInterrupts(float &drift) {
     boolean timerStart = ITimer.attachInterruptInterval(HW_TIMER_INTERVAL*1000L-offset,TimerHandler);
 
     if (timerStart) {
-        log(DEBUG,__FUNCTION__,"Starting ITimer, timer offset rounded to %li µs @%li ms timer interval.",offset,HW_TIMER_INTERVAL);
+        log(INFO,__FUNCTION__,"Starting ITimer, timer offset rounded to %li µs @%li ms timer interval.",offset,HW_TIMER_INTERVAL);
         sync_ISR_MinuteTrigger();
         ff_id = ISR_Timer.setInterval(TIMER_INTERVAL_FASTF,ISR_FastForward);
         log(DEBUG,__FUNCTION__,"ISR_FastForward timer started...");
