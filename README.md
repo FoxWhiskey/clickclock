@@ -30,7 +30,6 @@ For a slave clockwork to turn its hands (or flip a digit platelet), a simple ele
 ## Software Setup
 ### `NTP/wificonfig.h`
 Location for several system default constants such as Wifi credentials and other relevant data. All definitions in this file will be used by the _default constructor_ of `systemdata`-class, and can be altered with the `systemdata::collect()`-property in software. Required definitions are:
-* `HOSTNAME           `: hostname of system used when requesting IP-address
 * `SSID               `: the network SSID to connect to
 * `PASSWD             `: optional network password
 * `TIMEZONE           `: time zone of device (signed integer to specify hour offset to UTC, eg. 1 for Berlin/Paris)
@@ -80,6 +79,9 @@ When the system is started, no information is available on the polarity of the l
 * Make important runtime data permanent in the system's EEPROM, most importantly flags from the `ISRcom`-register (polarity of the next pulse (`F_POLARITY`), state of compensation minute (`F_CM_SET`)) and the present clockwork hand setting (`tt_hands`). In order not to wear out the board's EEPROM-memory to fast, system state will only be stored upon user request (`BUTN_2`- long press). When system state is saved, the **clockwork will be halted**, so that the system can be switched off safely.   
 On a reboot, connected to the same clockwork, the system will be able to resync to NTP-time without recompilation or any other user action.
 * As of `v1.2.1`, due to the use EEPROM memory as initialisation data source, the code has undergone a greater rewrite: default constants will now be loaded by the _default constructor_ of the `systemdata`-class. To simplifly the definition of default constants, all default data will be provided by `wificonfig.h` (even, if not directly related to WiFi-data).
+### v1.3.x
+* mainly bugfixes to get the DST-switchover working properly (nasty search!!)
+* implements an adaptive method to compensate for time drift of the microcontroller's clock: to improve the accuracy of the minute impulses, the software tracks the amount of processor-time (using `millis()`) elapsed until a time drift of 2 seconds have accumulated (ahead or behind _true time_). Then _Timer1_-interrupt is stopped and restarted with an adapted interval that compensates for the drift. Due to the design of the hardware timer (shortest interval step in 1µs) the maximum possible drift compensation is 1s per 13,89hrs (about 3 seconds in 2 days) at an interrupt interval of 50ms (default). To compensate for a time lag less than that, the interrupt interval has to be adjusted to a lower value...
 
 ## Tech Notes
 1. The [IDUINO DEBO DRV3][2] is a two-channel stepper motor developer board based on the L298N H-bridge chip. The board does not only drive stepper motors, but also has the ability to convert the input voltage (5-35V) down to 5V to supply power to connected microcontroller boards. The voltage regulation circuit is based on the 78M05. While the IDUINO datasheets allow input voltages of up to 35V, the maximum input ratings of the 78M05 cannot be told clearly from the relevant datasheet and may be limited to 18V. As a matter of fact, connecting the DEBO DRV3 to an input voltage of 24V destroys the on-board 78M05 immediately. Due to pin compatibility, it is possible to replace the chip by an LM341, granting a maximum input voltage of 35V.
@@ -93,10 +95,21 @@ Find the (DST-)extended library here: [FoxWhiskey/Time_DST][7]
 4. During my tests I found, that the cpu clock of the ESP8266 is pretty unstable and also temperature-sensitive (to some extent at least).   
 The first long time test showed, that the board drifts away from NTP time unacceptably fast (about 2 seconds early per day, in my case).   
 `v1.1.3` (and greater) implements a simple mechanism to re-synchronise the relevant _ISRs_ to NTP-time, so that the clockwork is powered on time. An attentive clock-watcher therefore may notice a slightly longer or shorter (indicated) minute once in a while...   
-An adaptive way to account for the time drift will be implemented with `v1.3.x` and greater. See milestone on Github.
+An adaptive way to account for the time drift will be implemented with `v1.3.1` and greater. See milestone on Github.
 
 5. Note, that flashing the ESP8266 with a new version of `clickclock` (or other firmware) does not erase `systemdata` stored in EEPROM. If you need default values to be considered on boot (those in `wificonfig.h`), flash memory of the system must be erased completely before flashing new firmware.   
 Close any monitor windows of _PlatfomIO_ and press "_Erase Flash_" in the PlatformIO-view of _vscode_.
+## TL;DR
+If you are not interested in all the nerd stuff and just want to run the clockwork, proceed as follows:   
+1. Setup an additional WiFi-network on your router and name it `TimeNet`. You may firewall all ports and services except `UDP/123`. Make it an open network, do not set a password.
+2. Download `clickclock.bin` from GitHub
+3. Turn the hands of your clockwork carefully to noon/midnight.
+4. Flash your ESP8266. Disconnect ESP from power as soon as flash process has completed.       
+5. Connect clockwork to the driver board and power up the system.
+6. Wait until the clockwork has finished the time setting process and compare indicated time to another clock source. Long press `BUTN_1`, if clockwork is late by a minute.
+7. Long press `BUTN_2` **before power off** to stop clockwork and save system state.
+* If power is disconnected without saving system state (7.), you **must** erase system EEPROM and start over with (3.)
+* Standard binary will set your clock to CET (Central European Time).
 ## Why is `clickclock` a _slave clock_ implementation?
 Err, well, the wording is misleading, to be honest! The software acutally implements a _mother clock_ :-).
 
