@@ -310,7 +310,7 @@ float reSyncClockWork(int lag,u_long millis_now,u_long& millis_start) {
     ISRcom &= ~F_INTRUN;                              // flag no interrupt service routines are running
     ITimer.detachInterrupt();                         // stop entire interrupt handling
     //sync_ISR_MinuteTrigger();                       // re-sync the ISR routines to NTP time
-    _drift = 0.0f;  // DEBUGGING ONLY !!!!
+    //_drift = 0.0f;  // DEBUGGING ONLY !!!!
     if (!setupInterrupts(_drift)) _drift = -1234.5;   // restart interrupt handling, return arbitrary value if failed
     millis_start = millis();                          // reset millis since last resync
 
