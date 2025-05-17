@@ -1,4 +1,4 @@
-signed long long getFakeTime();
+time_t getFakeTime();
 
 #define FSECOND   0
 #define FMINUTE   58

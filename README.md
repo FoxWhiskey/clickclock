@@ -30,6 +30,7 @@ For a slave clockwork to turn its hands (or flip a digit platelet), a simple ele
 ## Software Setup
 ### `NTP/wificonfig.h`
 Location for several system default constants such as Wifi credentials and other relevant data. All definitions in this file will be used by the _default constructor_ of `systemdata`-class, and can be altered with the `systemdata::collect()`-property in software. Required definitions are:
+* `MYHOSTNAME         `: hostname of system. Least 2 bytes of MAC-address will be appended by default!
 * `SSID               `: the network SSID to connect to
 * `PASSWD             `: optional network password
 * `TIMEZONE           `: time zone of device (signed integer to specify hour offset to UTC, eg. 1 for Berlin/Paris)

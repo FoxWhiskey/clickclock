@@ -18,17 +18,24 @@ extern float drift;
 */
 systemdata::systemdata() :  _hour(HOUR_HAND_DEFAULT),
                             _minute(MIN_HAND_DEFAULT),
-                            _ISRcom(0),
+                            _ISRcom(uint8_t(0)),
                             _timezone(TIMEZONE),
                             _setloglevel(DEFAULTLEVEL),
-                            _ssid(SSID),
                             _ntpinterval(NTPINTERVAL),
-                            _pass(PASSWD),
-                            _hostname("clickclock"),
-                            _ntpserver(NTPSERVER),
-                            _drift(0.0)
+                            _drift(0.0F)
 {
-    
+    // Initializing CStrings with lists is bad and no longer supported by my build chain. So let's do it properly!
+    strncpy(_ssid,SSID,MAX_SSID_SIZE-1);
+    _ssid[MAX_SSID_SIZE-1] = '\0';
+    strncpy(_pass,PASSWD,MAX_PW_SIZE-1);
+    _pass[MAX_PW_SIZE-1] = '\0';
+    strncpy(_pass,PASSWD,MAX_PW_SIZE-1);
+    _pass[MAX_PW_SIZE-1] = '\0';
+    strncpy(_hostname,MYHOSTNAME,MAX_HOSTNAME_S-1);
+    _hostname[MAX_HOSTNAME_S-1] = '\0';
+    strncpy(_ntpserver,NTPSERVER,MAX_HOSTNAME_S-1);
+    _ntpserver[MAX_HOSTNAME_S-1] = '\0';    
+   
     EEPROM.begin(sizeof(*this));
 
     if (EEPROM.percentUsed() >= 0) {
