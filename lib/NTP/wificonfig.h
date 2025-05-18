@@ -4,6 +4,7 @@
     #define DEFAULTLEVEL INFO
     #define HOUR_HAND_DEFAULT   0
     #define MIN_HAND_DEFAULT    0
+    #define MYHOSTNAME   "clickclock"
     #define SSID         "TimeNet"
     #define PASSWD       ""
     #define NTPSERVER    "de.pool.ntp.org"
