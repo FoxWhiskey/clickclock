@@ -170,6 +170,7 @@ void loop()
   if (ISRbtn & F_BUTN2LONG && !(ISRcom & F_SAFE)) {
    
     systemstate.collect();
+    systemstate.collect_hands();  // bugfix #26 - separate clockwork state from system state
     systemstate.write();
     ISR_Timer.disableAll();
     ISRcom &= ~F_SEC00;

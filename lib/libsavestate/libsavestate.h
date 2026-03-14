@@ -26,6 +26,7 @@ class systemdata
         systemdata();                           // constructor loads default data
         int percentUsed();
         void collect();
+        void collect_hands();
         void status();
         bool write();
         int get(get_service get_type,char* &data);  
