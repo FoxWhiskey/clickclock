@@ -178,8 +178,6 @@ void systemdata::status() {
 */
 void systemdata::collect(){
 
-    _hour = hour(tt_hands);
-    _minute = minute(tt_hands);
     _ISRcom = ISRcom;
     _setloglevel = setloglevel;
     _timezone = timeZone;
@@ -188,4 +186,14 @@ void systemdata::collect(){
     EEPROM.put(0,*this);
 }
 
+/**
+ * @brief Collect clockwork setting ONLY, update object and put it into EEPROM-buffer. DO NOT WRTIE!
+*/
+void systemdata::collect_hands(){
+
+    _hour = hour(tt_hands);
+    _minute = minute(tt_hands);
+
+    EEPROM.put(0,*this);
+}
 
