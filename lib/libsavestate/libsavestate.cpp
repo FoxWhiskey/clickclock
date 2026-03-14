@@ -164,6 +164,12 @@ void systemdata::status() {
 
     if (EEPROM.percentUsed() < 0) log(WARN,__FUNCTION__,"EEPROM: systemstate has not been stored yet.");
     else log(INFO,__FUNCTION__,"EEPROM: systemstate is of size %iB. %i%% EEPROM memory used.",sizeof(*this),EEPROM.percentUsed());
+
+    log(DEBUG,__FUNCTION__,"_hour/_minute/_ISRcom: %iB",sizeof(__uint8_t));
+    log(DEBUG,__FUNCTION__,"_timezone: %iB",sizeof(int8));
+    log(DEBUG,__FUNCTION__,"_timezone: %iB",sizeof(loglevel));
+    log(DEBUG,__FUNCTION__,"_ntpintervall: %iB",sizeof(time_t));
+    log(DEBUG,__FUNCTION__,"_drift: %iB",sizeof(float));
 }
 
 

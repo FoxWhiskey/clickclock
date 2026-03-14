@@ -4,7 +4,12 @@
    considered. As the largest data type is "time_t", all members must be aligned to 8 bytes.
    With the current setup, no padding bytes will be created and a total payload of 104 bytes
    can be used to store data on EEPROM.
+
+   Edit: time_t is now of size 4 bytes. Toolchain/Framework has been updated and is now of
+   size "long"
+   Therefore, the total payload is of size 100 bytes now...
    */
+
 #define MAX_SSID_SIZE   24 
 #define MAX_PW_SIZE     24
 #define MAX_HOSTNAME_S  18
@@ -37,7 +42,7 @@ class systemdata
         int8 _timezone;                          // time zone of clock (1 for CET)                 (1 byte)
         loglevel _setloglevel;                   // current loglevel                               (4 bytes)
         char _ssid[MAX_SSID_SIZE];               // SSID (WiFi)                                    (24 bytes)
-        time_t  _ntpinterval;                    // NTP resync interval of system clock (sec)      (8 bytes)
+        time_t  _ntpinterval;                    // NTP resync interval of system clock (sec)      (4 bytes)
         char _pass[MAX_PW_SIZE];                 // password (WiFi)                                (24 bytes)
         char _hostname[MAX_HOSTNAME_S];          // hostname of clickclock board                   (18 bytes)
         char _ntpserver[MAX_HOSTNAME_S];         // hostname of NTPserver                          (18 bytes)
